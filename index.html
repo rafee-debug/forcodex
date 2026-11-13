@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NPU-2N explorer · 2nm-class, ~1,000-TOPS NPU in interactive 3D</title>
+<meta name="description" content="Layer-by-layer interactive 3D explainer of a 2nm-class neural processing unit: what is inside, who builds it, and how it is designed and manufactured. All numbers are labelled as target, estimate or industry fact.">
+<style>
+:root{--bg:#05070d;--panel:rgba(9,13,22,.9);--line:rgba(120,165,210,.2);--txt:#d9e5f5;--dim:#8598b0;--cy:#22e6ff;--mg:#ff2bd6;--am:#ffb020;--gr:#3dffa8;--rd:#ff5a3c;--vi:#a78bfa;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+#stage{position:relative;height:100vh;min-height:640px;overflow:hidden;background:#05070d;user-select:none;-webkit-user-select:none}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
+#labels{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5}
+.lb{position:absolute;left:0;top:0;white-space:nowrap;font-size:11px;line-height:1.25;padding:2px 6px 3px;border-radius:5px;background:rgba(5,9,16,.8);border:1px solid rgba(120,170,220,.28);border-left:2px solid var(--c,var(--cy));color:#eaf3ff;will-change:transform;transition:opacity .18s}
+.lb b{font-weight:600}
+.lb span{display:block;color:#9fb3cc;font:10px/1.2 var(--mono)}
+.lb::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:12px;background:linear-gradient(var(--c,var(--cy)),transparent)}
+.lb.sm{font-size:10px;padding:0 4px;background:rgba(5,9,16,.55);border-color:transparent;border-left-color:transparent;color:#a9c4de}
+.lb.sm::after{display:none}
+.lb.hot{border-color:var(--rd);border-left-color:var(--rd);background:rgba(50,8,4,.9);color:#fff;font-size:12px;animation:pulse 1.2s infinite}
+.lb.go{border-color:var(--mg);border-left-color:var(--mg)}
+@keyframes pulse{50%{box-shadow:0 0 16px rgba(255,90,60,.8)}}
+#topbar{position:absolute;left:0;right:0;top:0;height:54px;display:flex;align-items:center;gap:12px;padding:0 12px;z-index:20;background:linear-gradient(180deg,rgba(4,6,11,.96),rgba(4,6,11,.6) 72%,transparent);pointer-events:none}
+#topbar>*{pointer-events:auto}
+.brand{min-width:200px}
+.brand b{font-size:15px;letter-spacing:.05em;background:linear-gradient(90deg,var(--cy),var(--mg));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand span{display:block;color:var(--dim);font-size:10.5px;margin-top:-2px}
+.tabs{display:flex;gap:3px;margin:0 auto;background:rgba(10,15,26,.92);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button,.btn,.tools button{border:0;background:transparent;padding:6px 12px;border-radius:7px;cursor:pointer;color:var(--dim);font-weight:600;text-decoration:none;white-space:nowrap}
+.tabs button:hover,.tools button:hover,.btn:hover{color:#fff;background:rgba(120,165,210,.12)}
+.tabs button.on{color:#fff;background:linear-gradient(90deg,rgba(34,230,255,.2),rgba(255,43,214,.2));box-shadow:inset 0 0 0 1px rgba(34,230,255,.5)}
+.tools{display:flex;gap:4px;min-width:200px;justify-content:flex-end}
+.tools button,.btn{border:1px solid var(--line);background:rgba(10,15,26,.92);font-weight:500;padding:5px 9px}
+.tools button.on{color:var(--cy);border-color:rgba(34,230,255,.5)}
+.panel{position:absolute;top:60px;bottom:50px;z-index:15;overflow:auto;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;scrollbar-width:thin;scrollbar-color:#27405c transparent;user-select:text;-webkit-user-select:text;transition:transform .25s}
+#left{left:10px;width:214px}
+#right{right:10px;width:332px}
+#left.shut{transform:translateX(-236px)}#right.shut{transform:translateX(354px)}
+.grip{position:absolute;top:66px;z-index:16;width:18px;height:40px;border:1px solid var(--line);background:var(--panel);color:var(--dim);cursor:pointer;padding:0;transition:left .25s,right .25s}
+#gripL{left:224px;border-radius:0 7px 7px 0;border-left:0}#gripR{right:342px;border-radius:7px 0 0 7px;border-right:0}
+#left.shut+#gripL{left:0}#gripR.shut{right:0}
+.panel h4{margin:10px 0 6px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.panel section:first-child h4{margin-top:2px}
+.panel h3{margin:0 0 4px;font-size:15px;color:#fff}
+.panel p{margin:4px 0 8px;color:#b8c8dc}
+.hint{color:var(--dim)!important;font-size:11px}
+#rail button{display:flex;width:100%;align-items:center;gap:8px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:7px;cursor:pointer;text-align:left;color:var(--dim)}
+#rail button i{font:600 10px var(--mono);width:22px;height:22px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);font-style:normal;flex:none}
+#rail button small{display:block;font:10px var(--mono);color:#6f84a0}
+#rail button:hover{color:#fff;background:rgba(120,165,210,.1)}
+#rail button.on{color:#fff;border-color:rgba(34,230,255,.45);background:rgba(34,230,255,.09)}
+#rail button.on i{background:var(--cy);color:#001318;border-color:var(--cy)}
+#layers{display:grid;gap:3px}
+#layers label{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:6px;cursor:pointer}
+#layers label:hover{background:rgba(120,165,210,.1)}
+#layers input{accent-color:var(--c);margin:0}
+#layers i{width:9px;height:9px;border-radius:2px;background:var(--c);box-shadow:0 0 8px var(--c)}
+input[type=range]{width:100%;accent-color:var(--cy);margin:2px 0}
+.row{display:flex;justify-content:space-between;color:var(--dim);font-size:10.5px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;background:rgba(120,165,210,.08);border-radius:7px;padding:2px}
+.seg button{border:0;background:transparent;padding:4px 2px;border-radius:5px;cursor:pointer;color:var(--dim);font-size:11.5px}
+.seg button.on{background:rgba(34,230,255,.18);color:#fff;box-shadow:inset 0 0 0 1px rgba(34,230,255,.45)}
+.seg.mg button.on{background:rgba(255,43,214,.2);box-shadow:inset 0 0 0 1px rgba(255,43,214,.55)}
+#ovLegend{margin-top:7px;font:10px var(--mono);color:var(--dim)}
+#ovLegend .grad{height:8px;border-radius:4px;margin:3px 0}
+.card{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:8px 0;background:rgba(120,165,210,.045)}
+.card h5{margin:0 0 5px;font-size:12px;color:#fff;display:flex;gap:6px;align-items:center;justify-content:space-between}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:12px}
+.kv dt{color:var(--dim)}
+.kv dd{margin:0;text-align:right;font:11.5px/1.45 var(--mono);color:#e9f2ff}
+.tg{display:inline-block;font:600 9px/1.5 var(--mono);font-style:normal;text-transform:uppercase;letter-spacing:.04em;padding:0 4px;border-radius:3px;margin-left:5px;vertical-align:1px;white-space:nowrap}
+.tg.T{color:var(--cy);background:rgba(34,230,255,.12);box-shadow:inset 0 0 0 1px rgba(34,230,255,.35)}
+.tg.E{color:var(--am);background:rgba(255,176,32,.12);box-shadow:inset 0 0 0 1px rgba(255,176,32,.35)}
+.tg.F{color:var(--gr);background:rgba(61,255,168,.1);box-shadow:inset 0 0 0 1px rgba(61,255,168,.35)}
+.note{font-size:11px;color:#9fb3cc;border-left:2px solid var(--mg);padding-left:7px;margin:6px 0 2px}
+.warn{border-left-color:var(--rd);color:#ffc9bd}
+.meter{margin:5px 0}
+.meter .row{color:#b8c8dc;font-size:11.5px}
+.meter .row b{font:11.5px var(--mono);color:#fff}
+.meter .tr{height:7px;border-radius:4px;background:rgba(120,165,210,.14);overflow:hidden}
+.meter .tr i{display:block;height:100%;border-radius:4px;background:var(--c,var(--cy));transition:width .35s}
+.big{font:600 22px/1.1 var(--mono);color:#fff}
+.big small{font:11px var(--mono);color:var(--dim)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fld{display:grid;gap:2px;font-size:11px;color:var(--dim)}
+.fld select,.fld input[type=number]{background:#0b1321;border:1px solid var(--line);border-radius:6px;padding:4px 6px;color:#fff;width:100%}
+.stack{display:flex;height:12px;border-radius:4px;overflow:hidden;margin:4px 0 6px}
+.stack i{display:block;height:100%}
+.lg{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11px;color:#b8c8dc}
+.lg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;background:var(--c)}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:4px 6px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.item:hover{background:rgba(120,165,210,.1)}
+.item.on{border-color:rgba(255,43,214,.55);background:rgba(255,43,214,.09)}
+.item b{font-weight:500;color:#e6f0ff;font-size:12px}
+.item em{font:11px var(--mono);font-style:normal;color:var(--cy)}
+.item .tr{grid-column:1/-1;height:3px;border-radius:2px;background:rgba(120,165,210,.14)}
+.item .tr i{display:block;height:100%;border-radius:2px;background:var(--c,var(--cy))}
+#hud{position:absolute;left:0;right:0;bottom:0;height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;z-index:14;background:linear-gradient(0deg,rgba(4,6,11,.96),rgba(4,6,11,.5) 75%,transparent);pointer-events:none;font-size:11.5px;color:var(--dim)}
+#fps{font:11px var(--mono);min-width:150px}
+#crumb{margin:0 auto;display:flex;align-items:center;gap:14px;color:#cfe0f5}
+#crumb b{color:#fff}
+#scale{display:flex;align-items:center;gap:6px;font:11px var(--mono);color:#cfe0f5}
+#scale i{display:block;height:6px;border:1px solid var(--cy);border-top:0;width:100px}
+#keys{min-width:150px;text-align:right}
+#tip{position:fixed;z-index:60;left:0;top:0;max-width:330px;pointer-events:none;display:none;padding:8px 10px;border-radius:9px;background:rgba(6,10,18,.96);border:1px solid rgba(34,230,255,.45);box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 18px rgba(34,230,255,.12);font-size:12px}
+#tip h5{margin:0;font-size:13px;color:#fff}
+#tip .s{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+#tip .go{margin-top:6px;color:var(--mg);font-weight:600;font-size:11.5px}
+#veil{position:absolute;inset:0;z-index:12;pointer-events:none;opacity:0;transition:opacity .34s;background:radial-gradient(circle at 50% 50%,rgba(34,230,255,.16),rgba(5,7,13,.97) 62%)}
+#veil.on{opacity:1}
+#dive{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:14;padding:5px 12px;border-radius:999px;border:1px solid rgba(255,43,214,.6);background:rgba(30,4,26,.9);color:#fff;font-size:12px;pointer-events:none;opacity:0;transition:opacity .2s}
+#dive.on{opacity:1}
+#dive i{display:inline-block;width:60px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);vertical-align:middle;margin-left:8px;overflow:hidden}
+#dive i u{display:block;height:100%;background:var(--mg);width:0}
+#fatal{position:absolute;inset:0;z-index:80;display:none;place-items:center;text-align:center;padding:40px;background:rgba(5,7,13,.94)}
+#fatal div{max-width:560px}
+#fatal h2{color:var(--mg)}
+#fatal code{font:12px var(--mono);color:var(--am);white-space:pre-wrap;word-break:break-word}
+body.m-team .lvl-only,body.m-timeline .lvl-only,body.m-ladder .lvl-only,body.m-timeline .lay-only,body.m-ladder .lay-only{display:none}
+body.m-timeline #left,body.m-ladder #left,body.m-timeline #gripL,body.m-ladder #gripL{display:none}
+@media (max-width:1000px){.brand span{display:none}.brand{min-width:0}.tools{min-width:0}.tabs button{padding:6px 8px}#keys{display:none}}
+@media (max-width:760px){#right{width:290px}#gripR{right:300px}.tools .btn,#btnReset{display:none}}
+/* ---------- text section ---------- */
+#doc{max-width:1120px;margin:0 auto;padding:36px 20px 80px;font-size:14px;line-height:1.55}
+#doc h1{font-size:26px;margin:0 0 6px;color:#fff}
+#doc h2{font-size:19px;margin:38px 0 10px;color:#fff;border-bottom:1px solid var(--line);padding-bottom:6px}
+#doc h3{font-size:14px;margin:22px 0 6px;color:var(--cy);letter-spacing:.06em;text-transform:uppercase}
+#doc p,#doc li{color:#c2d0e2}
+#doc .lead{color:var(--dim);margin-top:0}
+#doc table{width:100%;border-collapse:collapse;font-size:13px}
+#doc th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 8px;border-bottom:1px solid var(--line)}
+#doc td{padding:6px 8px;border-bottom:1px solid rgba(120,165,210,.1);vertical-align:top}
+#doc td:nth-child(2){font-family:var(--mono);font-size:12.5px;color:#fff}
+#doc td:nth-child(4){color:#9fb3cc;font-size:12.5px}
+#doc tr:hover td{background:rgba(120,165,210,.05)}
+#doc .tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:rgba(120,165,210,.03)}
+#doc .box{border:1px solid rgba(255,43,214,.45);background:rgba(255,43,214,.06);border-radius:10px;padding:12px 16px;margin:14px 0}
+#doc .box ul{margin:6px 0 0;padding-left:20px}
+#doc dl{display:grid;grid-template-columns:150px 1fr;gap:8px 16px;margin:0}
+#doc dt{font-weight:600;color:#fff}
+#doc dd{margin:0;color:#c2d0e2}
+#doc .tg{font-size:10px}
+#doc .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;color:#c2d0e2}
+@media (max-width:640px){#doc dl{grid-template-columns:1fr;gap:2px}#doc dd{margin-bottom:8px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body class="m-arch">
+<div id="stage">
+  <canvas id="gl" tabindex="0" aria-label="Interactive 3D model of a 2nm-class NPU system"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <header id="topbar">
+    <div class="brand"><b>NPU-2N explorer</b><span>2nm-class · ≈1,000 TOPS · design targets, not a product</span></div>
+    <nav class="tabs" id="modes" aria-label="Mode">
+      <button data-mode="arch" class="on">Architecture</button>
+      <button data-mode="flow">Data-flow</button>
+      <button data-mode="team">Team</button>
+      <button data-mode="timeline">Timeline</button>
+      <button data-mode="ladder">Ladder</button>
+    </nav>
+    <div class="tools">
+      <button id="btnLabels" class="on" title="Toggle labels (L)">Labels</button>
+      <button id="btnReset" title="Reset camera (R)">Reset view</button>
+      <a class="btn" href="#doc">Spec table ↓</a>
+    </div>
+  </header>
+  <aside id="left" class="panel" aria-label="View controls">
+    <section class="lvl-only"><h4>Zoom level</h4><div id="rail"></div>
+      <p class="hint">Click a part marked “→” or keep scrolling in to dive. Scroll out or press Esc to go up.</p></section>
+    <section class="lay-only"><h4>Layers</h4><div id="layers"></div></section>
+    <section class="lvl-only"><h4>Exploded view</h4><input type="range" id="explode" min="0" max="1" step="0.01" value="0" aria-label="Exploded view">
+      <div class="row"><span>assembled</span><span>exploded</span></div></section>
+    <section class="lvl-only"><h4>Overlay</h4>
+      <div class="seg" id="overlay"><button data-ov="off" class="on">Off</button><button data-ov="power">Power</button><button data-ov="heat">Heat</button><button data-ov="util">Util</button></div>
+      <div id="ovLegend"></div></section>
+  </aside>
+  <button class="grip" id="gripL" aria-label="Toggle left panel">‹</button>
+  <aside id="right" class="panel" aria-label="Details"><div id="rp"></div></aside>
+  <button class="grip" id="gripR" aria-label="Toggle right panel">›</button>
+  <div id="dive"></div>
+  <div id="hud">
+    <div id="fps"></div>
+    <div id="crumb"><span id="crumbT"></span><span id="scale"><i></i><span></span></span></div>
+    <div id="keys">drag orbit · right-drag pan · scroll zoom</div>
+  </div>
+  <div id="veil"></div>
+  <div id="fatal"><div><h2>3D view could not start</h2><p id="fatalMsg">This page loads Three.js from the jsDelivr CDN and needs WebGL 2. Check your connection and reload. The spec table and glossary below still work.</p><code id="fatalErr"></code></div></div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<main id="doc">
+  <h1>Spec table, glossary and honesty notes</h1>
+  <p class="lead">Everything the 3D model shows comes from the numbers below. They are generated from the same data the scene uses, so the table and the model cannot drift apart.</p>
+  <div class="box">
+    <b>Read this first.</b> This is a concept study, not a description of any real chip. Each number carries one of three labels:
+    <div class="legend">
+      <span><i class="tg T">target</i> a design goal chosen for this study (or simple arithmetic on such goals)</span>
+      <span><i class="tg E">estimate</i> my engineering estimate or an analyst/press-reported figure; could be off by 2× or more</span>
+      <span><i class="tg F">industry fact</i> published standard, vendor paper or announced specification</span>
+    </div>
+    <ul id="honesty"></ul>
+  </div>
+  <h2>Spec table</h2>
+  <div id="specs"></div>
+  <h2>Glossary</h2>
+  <dl id="gloss"></dl>
+  <noscript><p>JavaScript is required for the 3D model and for rendering the tables.</p></noscript>
+</main>
+
+<script>
+/* Single source of truth for every number on the page (3D scene + tables). */
+(function(){
+const K={cores:32,rows:4,cols:8,N:128,ops:2,f:1e9,tdp:[40,60],tdpNom:50,
+  bwHBM:2.0,bwLP:0.13,capHBM:[72,128],capLP:64,scratchMB:8,l2MB:128,sram:38.1,
+  die:[17.6,13.3],tile:[1.7,2.2],pe:8,vdd:0.7,wafer:30000,
+  // illustrative power model, W: [block, static, at full compute, at full memory stream]
+  pw:[['MAC arrays (32)',1.0,21.0,0],['Core logic: vector / transformer / control (32)',1.2,3.2,0],['Scratchpad SRAM (32 × 8 MB)',1.0,2.0,1.0],['Shared L2 SRAM',0.6,0.6,1.2],['NoC + command processor',0.8,0.8,1.0],['HBM PHYs (2)',0.6,0,4.4],['Memory controllers + encryption',0.3,0,1.2],['HBM stacks (2)',2.0,0,30.0],['UCIe + I/O die',2.0,0.3,0.2],['Clocks, IVR loss, leakage',2.5,1.5,1.0]]};
+K.macs=K.N*K.N; K.topsCore=K.macs*K.ops*K.f/1e12; K.tops8=K.cores*K.topsCore; K.tops4=2*K.tops8; K.topsFp=K.tops8/4;
+K.dieA=K.die[0]*K.die[1]; K.tileA=K.tile[0]*K.tile[1];
+K.pS=K.pw.reduce((a,r)=>a+r[1],0); K.pC=K.pw.reduce((a,r)=>a+r[2],0); K.pM=K.pw.reduce((a,r)=>a+r[3],0);
+K.gross=Math.PI*150*150/K.dieA-Math.PI*300/Math.sqrt(2*K.dieA);
+const PREC={int4:{n:'INT4',b:.5,tops:K.tops4,sp:.75},int8:{n:'INT8',b:1,tops:K.tops8,sp:.625},fp16:{n:'FP16 / BF16',b:2,tops:K.topsFp,sp:.5625}};
+/* Ideal upper-bound throughput: one pass over the weights per step; ignores attention, KV traffic and scheduling loss. */
+function perf(c){
+  const pr=PREC[c.prec],P=c.params*1e9,sp=!!c.sparse,lp=c.mem==='lp';
+  const bytes=P*pr.b*(sp?pr.sp:1),ops=2*P*(sp?.5:1),BW=(lp?K.bwLP:K.bwHBM)*1e12,R=pr.tops*1e12;
+  const n=c.phase==='prefill'?c.prompt:c.batch,tMem=bytes/BW,tCmp=n*ops/R;
+  let t=Math.max(tMem,tCmp),uc=tCmp/t,um=tMem/t;
+  const pStat=K.pS-(lp?1.5:0),dyn=K.pC*uc+K.pM*um*(lp?.1:1),s=Math.min(1,((c.tdp||1e9)-pStat)/dyn);
+  t/=s;uc*=s;um*=s;
+  return{n,bytes,ops,tMem,tCmp,t,uc,um,s,power:pStat+dyn*s,bound:tCmp>=tMem?'compute':'memory',tokps:n/t,perStream:1/t,tops:pr.tops*uc,
+    cross:pr.b*(sp?pr.sp:1)*R/(2*(sp?.5:1)*BW),fits:bytes/1e9<=(lp?K.capLP:K.capHBM[1])};
+}
+const roles=[
+ {id:'arch',n:'Chip architects',hc:[8,15],g:'design',does:'Workload analysis, micro-architecture, PPA trade-offs, the cycle-accurate model and the spec itself.',owns:'Floorplan budget and core micro-architecture',tools:'C++/SystemC simulators, Timeloop/Accelergy-style models, gem5'},
+ {id:'rtl',n:'RTL design',hc:[40,80],g:'design',does:'Writes the hardware: MAC arrays, vector and transformer units, NoC, memory controllers, command processor.',owns:'MAC arrays, vector + transformer units, NoC, controllers',tools:'SystemVerilog, Chisel, lint/CDC, HLS for datapaths'},
+ {id:'dv',n:'Verification (UVM · formal · emulation)',hc:[60,120],g:'design',does:'The largest team. Block and SoC-level UVM, formal proofs for control, NoC and security, emulation running real models before silicon.',owns:'Every block: functional sign-off',tools:'UVM simulators, formal tools, Palladium / ZeBu / Veloce emulators'},
+ {id:'pd',n:'Physical design (floorplan · P&R · sign-off)',hc:[30,60],g:'impl',does:'Turns the netlist into 234 mm² of layout: floorplan, power grid, place & route, timing, IR/EM, DRC/LVS closure.',owns:'The die as a whole, block hardening',tools:'Fusion Compiler / Innovus, PrimeTime / Tempus, RedHawk / Voltus, Calibre'},
+ {id:'dft',n:'DFT & test',hc:[10,20],g:'impl',does:'Scan, compression, memory BIST and repair, test patterns, tester programs, known-good-die strategy.',owns:'Test controller, scan chains, MBIST around 384 MB of SRAM',tools:'Tessent / TestMAX / Modus, ATE programs'},
+ {id:'ams',n:'Analog / mixed-signal (SerDes · PLL · memory PHY)',hc:[20,40],g:'impl',does:'Custom circuits that do not come from synthesis: HBM and UCIe PHYs, PLLs, SerDes, sensors, regulators.',owns:'HBM PHYs, UCIe PHY, PLLs, I/O-die SerDes, IVRs',tools:'Virtuoso / Custom Compiler, SPICE, EM solvers'},
+ {id:'sram',n:'SRAM / memory compiler',hc:[5,10],g:'impl',does:'Selects, tunes and qualifies bit-cells and compiled memories; owns Vmin, repair and ECC strategy.',owns:'32 scratchpads (256 MB) and the 128 MB L2',tools:'Foundry memory compilers, custom macros'},
+ {id:'pkg',n:'Packaging · thermal · SI/PI',hc:[15,30],g:'impl',does:'Interposer and substrate design, HBM integration, signal and power integrity, thermal solution, warpage.',owns:'Interposer, substrate, HBM attach, TIM and cold plate',tools:'Package layout, 3D field solvers, thermal CFD/FEA'},
+ {id:'sw',n:'Compiler · runtime · drivers (MLIR-based)',hc:[40,80],g:'sw',does:'Makes the silicon usable: graph compiler, scheduler, runtime, kernel driver, framework integration, profiling tools.',owns:'Host interface and the command-processor contract',tools:'MLIR/LLVM, IREE/TVM-style stacks, Linux kernel, PyTorch/ONNX front-ends'},
+ {id:'fw',n:'Firmware',hc:[10,20],g:'sw',does:'Boot ROM, secure boot chain, command-processor OS, power/thermal management loops, per-core micro-kernels.',owns:'Command processor, DVFS controller, RISC-V control cores',tools:'C/Rust, RTOS, RISC-V toolchains'},
+ {id:'ml',n:'ML · quantization · model porting',hc:[10,20],g:'sw',does:'Quantises and prunes real models to INT4/INT8/FP8 and 2:4 sparsity, proves accuracy, feeds requirements back to architects.',owns:'Number formats, quant/dequant and sparsity behaviour',tools:'PyTorch, QAT/PTQ toolchains, evaluation harnesses'},
+ {id:'sec',n:'Security',hc:[5,10],g:'design',does:'Threat model, root of trust, secure boot, memory encryption, TEE, side-channel and fault-injection review.',owns:'Security island, memory encryption engines',tools:'Formal security verification, certification labs'},
+ {id:'pm',n:'Foundry liaison · program management',hc:[10,10],g:'biz',does:'PDK versions, shuttle and wafer starts, mask orders, schedule, risk register, supplier management.',owns:'Schedule and the foundry relationship',tools:'Foundry portals, planning tools'},
+ {id:'psv',n:'Post-silicon validation & bring-up',hc:[20,40],g:'impl',does:'First power-on, characterisation across voltage and temperature, debug of silicon escapes, production test correlation.',owns:'First silicon on the bench: the whole card',tools:'Bench + ATE, scopes, BERTs, thermal chambers'},
+ {id:'prod',n:'Product · business · legal / IP licensing',hc:[5,15],g:'biz',est:true,does:'Customers, pricing, roadmap, IP and EDA contracts, export control, patents. Headcount is my assumption; the brief gives none.',owns:'The product definition and all licences',tools:'—'}];
+const ext=[
+ {id:'foundry',n:'Foundry',who:'TSMC · Samsung · Intel Foundry',gives:'PDK, wafer capacity, masks, yield learning, often the 2.5D packaging line too.'},
+ {id:'eda',n:'EDA vendors',who:'Synopsys · Cadence · Siemens EDA',gives:'Simulation, synthesis, place & route, sign-off, emulation hardware.'},
+ {id:'ip',n:'IP vendors',who:'HBM PHY · UCIe · PCIe 6 / CXL · SerDes · RISC-V · foundation IP',gives:'Licensed, silicon-proven hard and soft IP for the target node.'},
+ {id:'hbm',n:'HBM suppliers',who:'SK hynix · Samsung · Micron',gives:'HBM3E / HBM4 stacks. Supply is allocated, not simply bought.'},
+ {id:'osat',n:'OSAT / packaging house',who:'ASE · Amkor · SPIL, or foundry in-house',gives:'2.5D assembly, substrates, final test and system-level test.'}];
+const stages=[
+ {id:'spec',n:'Spec & requirements',a:0,b:3,g:'def',d:'Workloads, PPA targets, interfaces and cost ceiling. Cheap to change now, ruinous later.'},
+ {id:'arch',n:'Architecture exploration',a:1,b:8,g:'def',d:'A cycle-accurate simulator runs real LLM traces and sizes the MAC arrays, SRAM, NoC and HBM bandwidth.'},
+ {id:'rtl',n:'RTL design',a:4,b:17,g:'des',d:'Synthesizable description of every block; frozen in stages (0.5, 0.8, 1.0) so back-end work can start early.'},
+ {id:'dv',n:'Verification & emulation',a:5,b:23.5,g:'des',d:'Runs until tape-out and absorbs the most people. Emulators boot firmware and run real models at kHz-MHz speed.'},
+ {id:'syn',n:'Synthesis + DFT',a:10,b:20,g:'imp',d:'RTL to gates, scan and memory-BIST insertion, early timing and power estimates.'},
+ {id:'pnr',n:'Floorplan · place & route',a:9,b:22,g:'imp',d:'Block hardening, power grid on the backside network, clock tree, routing through 16 metal layers.'},
+ {id:'so',n:'Sign-off',a:19,b:23.5,g:'imp',d:'Timing, power, IR drop, electromigration, DRC and LVS must all close at every corner at once.'},
+ {id:'to',n:'Tape-out (GDSII)',a:23.5,b:24.1,g:'fab',d:'The layout database goes to the foundry. After this, every fix costs masks and months.'},
+ {id:'mask',n:'Mask set',a:23.8,b:25.3,g:'fab',d:'Dozens of masks, 20+ of them EUV (estimate), written and inspected in about 4–8 weeks.'},
+ {id:'fab',n:'Wafer fab',a:24.8,b:29,g:'fab',d:'Hundreds to 1,000+ process steps with EUV exposure; about 3–5 months for first wafers including queue time.'},
+ {id:'pkg',n:'Advanced packaging',a:28.6,b:30.4,g:'fab',d:'Wafer sort, dicing, known-good dies onto the interposer with HBM, underfill, substrate attach.'},
+ {id:'test',n:'Test & binning',a:29,b:32,g:'post',d:'Wafer sort, final test and system-level test; parts are binned by speed and power.'},
+ {id:'bu',n:'Bring-up & validation',a:30.2,b:34.5,g:'post',d:'First power-on, PLL lock, link training, memory training, first inference, then weeks of characterisation.'},
+ {id:'sw',n:'Software enablement',a:6,b:36,g:'sw',d:'Starts on the simulator, moves to emulation, then silicon. A chip without a compiler is a paperweight.'},
+ {id:'vol',n:'Volume production',a:34,b:36,g:'post',d:'Ramp, yield improvement and qualification. A respin (B0) is common and adds about 4–6 months.'}];
+const chal=[
+ {id:'yield',n:'Yield',at:'fab',m:27,d:'234 mm² is a large die for a young node. With 0.1–0.4 defects/cm² (assumption) Poisson yield is about 79–39%, from roughly 258 gross dies per 300 mm wafer.'},
+ {id:'var',n:'Variability',at:'so',m:20.4,d:'Sheet width, thickness and work-function variation widen timing and SRAM Vmin margins, so sign-off needs statistical corners.'},
+ {id:'pd',n:'Power density',at:'pnr',m:14,d:'MAC arrays reach about 0.65–0.75 W/mm² in this model. The floorplan interleaves hot logic with cooler SRAM for that reason.'},
+ {id:'ir',n:'IR drop',at:'so',m:22.4,d:'About 50–70 A at about 0.7 V: each milliohm in the grid costs 50–70 mV, up to 10% of the supply. This is the case for backside power.'},
+ {id:'th',n:'Thermal limits',at:'pkg',m:29.6,d:'Backside power thins the silicon and buries transistors between two metal stacks, so heat spreads less well. Stacked SRAM and HBM (about 95 °C class) share the heat path.'},
+ {id:'sram',n:'SRAM scaling stall',at:'arch',m:5,d:'Bit-cell density grew only about 10–15% into the 2nm class (38.1 Mb/mm² reported). 384 MB of on-die SRAM costs about 81 mm², a third of the die.'},
+ {id:'cost',n:'Mask & EDA cost',at:'mask',m:24.6,d:'A 2nm-class mask set runs to tens of $M (estimate); EDA licences, emulation and compute add tens of $M a year. A respin repeats much of it.'}];
+const cost=[['People: 300–600 × 2.5–3 yr × $0.2–0.35M loaded',150,630],['EDA licences, emulation, compute',30,100],['IP licences (PHYs, SerDes, cores, foundation IP)',15,60],['Mask sets (1–2 full sets)',20,80],['Prototype wafers, packaging, test, lab',20,60]];
+const ladder=[
+ {id:'a',n:'Simulate + open-source RTL',sub:'Architecture simulator · RISC-V · Gemmini · NVDLA',cost:'$0–5k',time:'1–6 months',team:'1–3',does:'Model the accelerator in software, then run open RTL in simulation. Learn where the time and energy really go.',tools:'Chipyard + Gemmini (systolic-array generator), NVDLA, Verilator, cocotb, SCALE-Sim, Timeloop, IREE/TVM/MLIR',gate:'The simulator shows a real PPA win on your target model against a baseline, and you can explain why.'},
+ {id:'b',n:'FPGA prototype',sub:'Run a real quantised model end to end',cost:'$0.3k–15k',time:'3–9 months',team:'1–5',does:'Put the design on an FPGA board and run an actual model. Timing closure, memory interfaces and the compiler all become real problems.',tools:'AMD Zynq UltraScale+ / Kria / Alveo, Vivado, LiteX',gate:'Bit-accurate against the simulator, measured throughput, and a working (even crude) compiler path.'},
+ {id:'c',n:'MPW shuttle on a mature node',sub:'Tiny Tapeout · SkyWater 130 nm · GF 180 nm',cost:'≈ $0.2k–20k',time:'6–12 months (4–6 in fab)',team:'1–5',does:'Tape out a small slice of the design on a shared wafer. A few mm² and a few MHz, but real silicon with real bring-up.',tools:'OpenLane / LibreLane, open PDKs (sky130, gf180mcu, IHP SG13G2), Tiny Tapeout, ChipFoundry, wafer.space',gate:'Working silicon whose measured power and timing match sign-off. You now understand DFT, packaging and bring-up.'},
+ {id:'d',n:'Licensed NPU IP in a mature-node SoC',sub:'Arm Ethos · Cadence Tensilica · Synopsys ARC NPX · CEVA',cost:'≈ $5–50M',time:'18–30 months',team:'30–100',does:'Buy the engine, differentiate on system and software. 28 / 22 / 16 / 12 nm, commercial EDA, a real product.',tools:'Commercial EDA, foundry PDK, licensed NPU and interface IP',gate:'Paying customers, a software stack people use, and volume that justifies a custom engine.'},
+ {id:'e',n:'Custom 2nm-class NPU',sub:'Large funding + foundry partnership',cost:'≈ $0.3–1B+',time:'24–36+ months',team:'300–600',does:'Everything on this page. Only with capital, an experienced team, HBM allocation and a foundry that will take your wafers.',tools:'The full flow shown in Timeline mode',gate:'Foundry allocation, HBM supply, and a balance sheet that survives a respin.'}];
+
+const f0=x=>Math.round(x).toLocaleString('en-US'),f1=x=>x.toLocaleString('en-US',{maximumFractionDigits:1}),f2=x=>x.toLocaleString('en-US',{maximumFractionDigits:2});
+const pf=c=>perf(Object.assign({phase:'decode',params:7,prec:'int4',batch:1,prompt:2048,mem:'hbm',sparse:false},c));
+const hcMin=roles.reduce((a,r)=>a+r.hc[0],0),hcMax=roles.reduce((a,r)=>a+r.hc[1],0);
+const cMin=cost.reduce((a,r)=>a+r[1],0),cMax=cost.reduce((a,r)=>a+r[2],0);
+const sramMM=mb=>mb*8/K.sram;
+const spec=[
+ ['Performance',[
+  ['NPU cores',`${K.cores} (${K.rows} × ${K.cols} grid)`,'T',''],
+  ['MAC array per core',`${K.N} × ${K.N} = ${f0(K.macs)} PEs`,'T','Systolic array; one multiply-accumulate per PE per cycle.'],
+  ['Clock','≈ 1 GHz (1 ns cycle)','T','Assumes the multiplier + adder path closes at 1 ns in a 2nm-class library.'],
+  ['Peak dense INT8',`${K.cores} × ${f0(K.macs)} × 2 ops × 1 GHz = ${f0(K.tops8)} TOPS`,'T','Arithmetic on the targets above. Peak, every PE busy every cycle; not sustained throughput.'],
+  ['Peak INT4',`≈ ${f0(K.tops4)} TOPS`,'T','Assumes each PE splits into two INT4 MACs per cycle.'],
+  ['FP8','≈ INT8 rate','E','Assumes the 8-bit multiplier is shared with an FP8 mantissa path.'],
+  ['FP16 / BF16',`≈ ${f0(K.topsFp)} TOPS`,'E','Assumes 2 × 2 PEs fuse into one wide MAC, i.e. a quarter of the INT8 rate.'],
+  ['2:4 structured sparsity','≤ 2× throughput; weight bytes × 0.625 (INT8)','E','(2 × 8 + 4 index bits) / 32 = 0.625. Only on layers pruned to this pattern.'],
+  ['“Mega-TOPS”',`${f0(K.tops8)} TOPS = ${(K.tops8/1e3).toFixed(2)} × 10¹⁵ ops/s`,'T',`Used loosely. A literal 1,000,000 TOPS needs about ${f0(1e6/K.tops8)} of these chips linked together.`],
+  ['TDP','40–60 W, configurable','T','Includes the HBM stacks. Enforced by DVFS and power capping.'],
+  ['Efficiency',`${f1(K.tops8/40)} / ${f1(K.tops8/50)} / ${f1(K.tops8/60)} TOPS/W at 40 / 50 / 60 W`,'T',`Peak TOPS divided by TDP. The 20+ TOPS/W goal only holds at or below ${f0(K.tops8/20)} W.`],
+  ['Energy budget',`≈ ${f0(50/(K.tops8*1e12)*1e15)} fJ per op, ≈ ${f0(2*50/(K.tops8*1e12)*1e15)} fJ per MAC at 50 W`,'T','All-in: arithmetic, clocks, SRAM, NoC, memory, leakage.'],
+  ['INT8 MAC datapath energy','≈ 30–50 fJ','E','Scaled from published 7 nm arithmetic energy figures. Uses up to half of the budget above.'],
+  ['Core supply current',`≈ ${f0(50/K.vdd)} A at ≈ ${K.vdd} V and 50 W`,'E',''],
+  ['Hotspot power density','≈ 0.65–0.75 W/mm² (MAC arrays)','E','From the power model below: 21 W over 32 × 1.04 mm².']]],
+ ['LLM workloads (ideal upper bounds)',[
+  ['Model size','7B–70B parameters','T','Vision, speech and multimodal models are smaller and fit the same engine.'],
+  ['Weights in memory','3.5 GB (7B INT4) · 35 GB (70B INT4) · 70 GB (70B INT8)','T','Parameters × bytes per parameter.'],
+  ['Decode, batch 1',`≤ ${f0(pf({}).tokps)} tok/s (7B INT4) · ≤ ${f0(pf({params:70}).tokps)} (70B INT4) · ≤ ${f0(pf({params:70,prec:'int8'}).tokps)} (70B INT8)`,'E','Memory bandwidth ÷ weight bytes at 2 TB/s. Ignores KV-cache reads, which grow with context length.'],
+  ['MAC utilisation in batch-1 decode',`≈ ${(pf({prec:'int8'}).uc*100).toFixed(2)}%`,'E','The arrays could use 16.4 TB/s of fresh weights per core; HBM delivers 0.06. Decode is memory-bound.'],
+  ['Compute / memory crossover',`≈ ${f0(pf({prec:'int8'}).cross)} sequences or prompt tokens`,'E','INT8 at 2 TB/s. Above this, compute is the limit; below it, memory is.'],
+  ['Prefill, 2,048-token prompt',`≥ ${f0(pf({phase:'prefill',prec:'int8'}).t*1e3)} ms (7B) · ≥ ${f0(pf({phase:'prefill',prec:'int8',params:70}).t*1e3)} ms (70B), INT8`,'E','Compute-bound. Ignores attention cost, which grows with the square of prompt length.'],
+  ['LPDDR6 edge variant, decode',`≤ ${f0(pf({mem:'lp'}).tokps)} tok/s (7B INT4)`,'E','Same engine starved by a ≈ 0.13 TB/s memory.']]],
+ ['Memory hierarchy',[
+  ['PE pipeline registers',`${f1(K.macs*2*K.f/1e12)} TB/s per core`,'T','16,384 PEs × 2 bytes per cycle. Derived from the targets.'],
+  ['Array edge intake','256 GB/s per core','T','128 weight bytes + 128 activation bytes per cycle.'],
+  ['Local scratchpad SRAM',`${K.scratchMB} MB per core (range 4–8), 256 GB/s`,'T','Two 1,024-bit ports at 1 GHz.'],
+  ['Shared L2 SRAM',`${K.l2MB} MB (range 64–128), ≈ 2.05 TB/s`,'T','Two 64 MB banks, 32 ports × 512 bit at 1 GHz.'],
+  ['3D-stacked SRAM (optional)','≈ 256 MB, ≈ 2 TB/s','E','Hybrid-bonded die on an older node. Sits in the heat path.'],
+  ['HBM (high-end variant)',`2 stacks, ≥ ${K.bwHBM} TB/s aggregate, ${K.capHBM[0]}–${K.capHBM[1]} GB`,'T','The model uses 2.0 TB/s sustained.'],
+  ['HBM3E, per stack','1,024 I/O, ≈ 9.2–9.8 Gb/s per pin, ≈ 1.2 TB/s, 36 GB (12-high)','F','Vendor figures.'],
+  ['HBM4, per stack','2,048 I/O, up to 8 Gb/s per pin, up to 2 TB/s, up to 64 GB (16-high)','F','JEDEC JESD270-4, April 2025.'],
+  ['HBM energy',`≈ 1.9 pJ/bit assumed → ${f0(K.pM-10)} W for the stacks at 2 TB/s`,'E','Published HBM2-era figures are near 3.9 pJ/bit. At 3 pJ/bit the stacks alone would draw 48 W.'],
+  ['LPDDR6 (edge variant)','≈ 0.11–0.15 TB/s (4 channels)','E','LPDDR6 itself is JEDEC JESD209-6 (July 2025); the channel count and rate here are assumptions.'],
+  ['On-die SRAM total',`${f0(K.cores*K.scratchMB+K.l2MB)} MB ≈ ${f0(sramMM(K.cores*K.scratchMB+K.l2MB))} mm²`,'E',`At ${K.sram} Mb/mm². ECC, repair and periphery make real arrays larger.`],
+  ['HD SRAM macro density',`${K.sram} Mb/mm²`,'F','Reported for 2nm-class nanosheet processes at ISSCC 2025.']]],
+ ['Die, process and device',[
+  ['Process','2nm-class GAA nanosheet, EUV, backside power','T','TSMC N2 / Samsung SF2 / Intel 18A style.'],
+  ['Backside power availability','Intel 18A (PowerVia), TSMC A16 (Super Power Rail), Samsung SF2Z','F','TSMC’s base N2 keeps power on the front side, so this target is closest to 18A / A16 / SF2Z.'],
+  ['Compute die',`${K.die[0]} × ${K.die[1]} mm ≈ ${f0(K.dieA)} mm²`,'E','From the floorplan in the model.'],
+  ['NPU core tile',`${K.tile[0]} × ${K.tile[1]} mm = ${f2(K.tileA)} mm²; 32 tiles ≈ ${f0(32*K.tileA)} mm²`,'E',''],
+  ['MAC array',`1.02 × 1.02 mm ≈ 1.04 mm² per core`,'E','≈ 64 µm² per PE.'],
+  ['MAC PE',`≈ ${K.pe} × ${K.pe} µm, ≈ 8,000 transistors`,'E',''],
+  ['Transistor count','≈ 30 billion','E','≈ 18 B in SRAM (6 per bit), ≈ 4 B in MAC arrays, the rest in logic and PHYs.'],
+  ['Gate pitch / gate length','≈ 48 nm / ≈ 12 nm','E','Analyst-reported class values, not foundry-confirmed.'],
+  ['Nanosheets','3 per device, ≈ 5–6 nm thick, ≈ 15–45 nm wide','E','Typical published ranges.'],
+  ['Metal stack','16 front-side layers (range 15–20) + 3 backside','T','Lowest ≈ 8 layers EUV-patterned at ≈ 20–44 nm pitch (estimate).'],
+  ['EUV lithography','13.5 nm wavelength, 0.33 NA; high-NA is 0.55','F',''],
+  ['Lithography field','26 × 33 mm = 858 mm²','F','The interposer in this model is larger than one field and must be stitched.']]],
+ ['Package, I/O and card',[
+  ['Package','2.5D: compute die + I/O die + 2 HBM stacks on a silicon interposer','T',''],
+  ['Interposer','≈ 44 × 23.5 mm ≈ 1,034 mm²','E',''],
+  ['I/O die','≈ 10 × 6 mm on N5/N6','E','SerDes and analog gain little from 2 nm and cost far less on an older node.'],
+  ['UCIe die-to-die link','4 modules × 64 lanes × 32 GT/s ≈ 8.2 Tb/s ≈ 1 TB/s per direction','T','Raw rate.'],
+  ['UCIe standard','Up to 32 GT/s (UCIe 2.0); 48 and 64 GT/s added in UCIe 3.0; 25–55 µm bump pitch (advanced package)','F','UCIe 3.0 was released in August 2025.'],
+  ['Host interface','PCIe 6.0 x16: 64 GT/s per lane, ≈ 128 GB/s raw per direction','F','16 × 64 Gb/s = 1,024 Gb/s. CXL 3.x runs on the same PHY.'],
+  ['Chip-to-chip links','16 lanes × 112 Gb/s ≈ 1.8 Tb/s','T','For multi-NPU scaling.'],
+  ['Hybrid bonding pitch','≤ 9 µm','F','As shipped in 3D-stacked cache products.'],
+  ['Bump pitches','micro-bump ≈ 40–55 µm · C4 ≈ 130–150 µm · BGA ≈ 1.0–1.27 mm','E','Typical values; drawn sparser in the model.'],
+  ['Card','PCIe FHHL 167.65 × 111.15 mm, single slot','F','Form-factor dimensions.'],
+  ['Slot power','≤ 75 W from an x16 slot','F','So a 40–60 W card needs no auxiliary power connector.'],
+  ['Cooling budget','≲ 1 °C/W junction to inlet air','E','(95 °C − 45 °C) ÷ 50 W.']]],
+ ['Power model used for overlays (illustrative)',K.pw.map(r=>[r[0],`${f1(r[1])} W idle · +${f1(r[2])} W at full compute · +${f1(r[3])} W at full memory stream`,'E','']).concat([
+  ['Total',`${f1(K.pS)} W idle + ${f1(K.pC)} W × compute use + ${f1(K.pM)} W × memory use`,'E','My assumptions, tuned so full dense INT8 lands near 50 W. Not a measurement or a simulation.'],
+  ['Thermal overlay','coolant-side 45 °C + 0.25 °C/W × total + local term from blurred power density','E','A picture of where heat concentrates, not CFD or FEA.']])],
+ ['Team',roles.map(r=>[r.n,r.hc[0]===r.hc[1]?`${r.hc[0]}`:`${r.hc[0]}–${r.hc[1]}`,'E',r.est?'My assumption; the brief gives no number.':'']).concat([['Total',`${hcMin}–${hcMax} people`,'E','Ballpark for a full-custom 2nm program. Real programs vary widely with IP reuse.']])],
+ ['Program',[
+  ['Schedule','24–36+ months spec to volume; 34 months drawn','E','24 months only for a derivative design with heavy reuse. A respin adds about 4–6 months.'],
+  ['Wafer fab cycle','≈ 3–5 months','E','Hundreds to 1,000+ process steps.'],
+  ['Total program cost',`≈ $${(cMin/1e3).toFixed(2)}–${(cMax/1e3).toFixed(2)} billion`,'E','Sum of the rows below. Order of magnitude only.']].concat(cost.map(r=>[r[0],`$${r[1]}–${r[2]}M`,'E',''])).concat([
+  ['Analyst reference','≈ $725M to design a large 2nm chip','E','International Business Strategies estimate, 2023, as reported in the trade press.'],
+  ['Wafer price',`≈ $${f0(K.wafer)} per 300 mm wafer`,'E','Press-reported, not confirmed by the foundry.'],
+  ['Gross dies per wafer',`≈ ${f0(K.gross)}`,'E',`Standard die-per-wafer formula for ${f0(K.dieA)} mm².`],
+  ['Yield','≈ 39–79%','E','Poisson model, 0.4–0.1 defects/cm² (assumption).'],
+  ['Compute die cost',`≈ $${f0(K.wafer/(K.gross*.79))}–${f0(K.wafer/(K.gross*.39))} per good die`,'E','Before HBM, interposer, packaging and test, which together cost more than the die.']])],
+ ['Reality-check ladder',ladder.map(s=>[`(${s.id}) ${s.n}`,`${s.cost} · ${s.time} · team ${s.team}`,'E','Shuttle and board prices change; check current listings.'])]];
+const gloss=[
+ ['NPU','Neural processing unit. A processor built for the arithmetic of neural networks, mostly huge numbers of multiply-accumulate operations, rather than general-purpose code.'],
+ ['TOPS','Trillions of operations per second. Usually counted as 2 operations (one multiply, one add) per MAC at a stated precision. A peak figure; it says nothing about memory limits or real model speed.'],
+ ['MAC','Multiply-accumulate: a × w + acc. The basic operation of a neural network layer, and the unit the compute array is built from.'],
+ ['Systolic array','A grid of identical processing elements where data moves one neighbour per clock tick, like a heartbeat. Here activations flow west to east and weights north to south.'],
+ ['GAA','Gate-all-around. The transistor gate wraps the channel on every side. In 2nm-class processes the channel is a stack of thin silicon nanosheets.'],
+ ['BSPDN','Backside power delivery network. Power rails are built on the back of the wafer, leaving the front-side metal for signals and reducing voltage drop.'],
+ ['EUV','Extreme ultraviolet lithography, 13.5 nm light, used to print the smallest layers of a chip.'],
+ ['NoC','Network-on-chip. On-die routers and links, here a 2D mesh, that carry data between cores, memories and controllers.'],
+ ['HBM','High-bandwidth memory. DRAM dies stacked and connected by through-silicon vias, placed next to the processor on an interposer.'],
+ ['UCIe','Universal Chiplet Interconnect Express. An open standard for die-to-die links inside a package.'],
+ ['DVFS','Dynamic voltage and frequency scaling. Lowering supply voltage and clock rate at run time to trade speed for power.'],
+ ['Tape-out','The moment the finished layout is released to the foundry for mask making. The point of no (cheap) return.'],
+ ['GDSII','The file format (now often OASIS) in which a chip layout is delivered: polygons on layers.'],
+ ['MPW','Multi-project wafer. Many small designs share one mask set and wafer run, cutting prototype cost by orders of magnitude.']];
+const honesty=[
+ 'The targets are mutually tight. 1,049 TOPS inside 50 W leaves about 95 fJ per MAC for everything; the arithmetic alone plausibly takes 30–50 fJ.',
+ 'Full-rate HBM streaming may not fit the power budget. At 2 TB/s the two stacks draw roughly 30–60 W depending on energy per bit, which is the whole TDP. The model assumes the optimistic end and throttles under the cap.',
+ 'TOPS is a peak number. In single-stream LLM decode the MAC arrays are under 1% busy because memory bandwidth, not compute, sets the speed.',
+ 'Area figures use the best reported SRAM macro density and analyst-reported pitches. A real floorplan would be larger.',
+ 'Vertical dimensions in the package view are exaggerated, and the transistor view is schematic rather than to scale.',
+ 'Team size, schedule and cost are ballparks. Published program costs are themselves estimates and differ by a factor of two or more.'];
+window.NPU={K,PREC,perf,roles,ext,stages,chal,cost,ladder,spec,gloss,hcMin,hcMax,cMin,cMax,f0,f1,f2};
+const TAG={T:'target',E:'estimate',F:'industry fact'};
+document.getElementById('specs').innerHTML=spec.map(([g,rows])=>`<h3>${g}</h3><div class="tw"><table><thead><tr><th style="width:25%">Parameter</th><th style="width:33%">Value</th><th style="width:11%">Basis</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td><i class="tg ${r[2]}">${TAG[r[2]]}</i></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`).join('');
+document.getElementById('gloss').innerHTML=gloss.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
+document.getElementById('honesty').innerHTML=honesty.map(h=>`<li>${h}</li>`).join('');
+window.addEventListener('error',e=>{if(!window.__npuReady){const f=document.getElementById('fatal');f.style.display='grid';document.getElementById('fatalErr').textContent=String(e.message||e.error||'');}});
+setTimeout(()=>{if(!window.__npuReady)document.getElementById('fatal').style.display='grid';},15000);
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+//@@NEXT
+</script>
+</body>
+</html>
