@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NPU-2N explorer · 2nm-class, ~1,000-TOPS NPU in interactive 3D</title>
+<meta name="description" content="Layer-by-layer interactive 3D explainer of a 2nm-class neural processing unit: what is inside, who builds it, and how it is designed and manufactured. All numbers are labelled as target, estimate or industry fact.">
+<style>
+:root{--bg:#05070d;--panel:rgba(9,13,22,.9);--line:rgba(120,165,210,.2);--txt:#d9e5f5;--dim:#8598b0;--cy:#22e6ff;--mg:#ff2bd6;--am:#ffb020;--gr:#3dffa8;--rd:#ff5a3c;--vi:#a78bfa;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+#stage{position:relative;height:100vh;min-height:640px;overflow:hidden;background:#05070d;user-select:none;-webkit-user-select:none}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
+#labels{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5}
+.lb{position:absolute;left:0;top:0;white-space:nowrap;font-size:11px;line-height:1.25;padding:2px 6px 3px;border-radius:5px;background:rgba(5,9,16,.8);border:1px solid rgba(120,170,220,.28);border-left:2px solid var(--c,var(--cy));color:#eaf3ff;will-change:transform;transition:opacity .18s}
+.lb b{font-weight:600}
+.lb span{display:block;color:#9fb3cc;font:10px/1.2 var(--mono)}
+.lb::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:12px;background:linear-gradient(var(--c,var(--cy)),transparent)}
+.lb.sm{font-size:10px;padding:0 4px;background:rgba(5,9,16,.55);border-color:transparent;border-left-color:transparent;color:#a9c4de}
+.lb.sm::after{display:none}
+.lb.hot{border-color:var(--rd);border-left-color:var(--rd);background:rgba(50,8,4,.9);color:#fff;font-size:12px;animation:pulse 1.2s infinite}
+.lb.go{border-color:var(--mg);border-left-color:var(--mg)}
+@keyframes pulse{50%{box-shadow:0 0 16px rgba(255,90,60,.8)}}
+#topbar{position:absolute;left:0;right:0;top:0;height:54px;display:flex;align-items:center;gap:12px;padding:0 12px;z-index:20;background:linear-gradient(180deg,rgba(4,6,11,.96),rgba(4,6,11,.6) 72%,transparent);pointer-events:none}
+#topbar>*{pointer-events:auto}
+.brand{min-width:200px}
+.brand b{font-size:15px;letter-spacing:.05em;background:linear-gradient(90deg,var(--cy),var(--mg));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand span{display:block;color:var(--dim);font-size:10.5px;margin-top:-2px}
+.tabs{display:flex;gap:3px;margin:0 auto;background:rgba(10,15,26,.92);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button,.btn,.tools button{border:0;background:transparent;padding:6px 12px;border-radius:7px;cursor:pointer;color:var(--dim);font-weight:600;text-decoration:none;white-space:nowrap}
+.tabs button:hover,.tools button:hover,.btn:hover{color:#fff;background:rgba(120,165,210,.12)}
+.tabs button.on{color:#fff;background:linear-gradient(90deg,rgba(34,230,255,.2),rgba(255,43,214,.2));box-shadow:inset 0 0 0 1px rgba(34,230,255,.5)}
+.tools{display:flex;gap:4px;min-width:200px;justify-content:flex-end}
+.tools button,.btn{border:1px solid var(--line);background:rgba(10,15,26,.92);font-weight:500;padding:5px 9px}
+.tools button.on{color:var(--cy);border-color:rgba(34,230,255,.5)}
+.panel{position:absolute;top:60px;bottom:50px;z-index:15;overflow:auto;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;scrollbar-width:thin;scrollbar-color:#27405c transparent;user-select:text;-webkit-user-select:text;transition:transform .25s}
+#left{left:10px;width:214px}
+#right{right:10px;width:332px}
+#left.shut{transform:translateX(-236px)}#right.shut{transform:translateX(354px)}
+.grip{position:absolute;top:66px;z-index:16;width:18px;height:40px;border:1px solid var(--line);background:var(--panel);color:var(--dim);cursor:pointer;padding:0;transition:left .25s,right .25s}
+#gripL{left:224px;border-radius:0 7px 7px 0;border-left:0}#gripR{right:342px;border-radius:7px 0 0 7px;border-right:0}
+#left.shut+#gripL{left:0}#gripR.shut{right:0}
+.panel h4{margin:10px 0 6px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.panel section:first-child h4{margin-top:2px}
+.panel h3{margin:0 0 4px;font-size:15px;color:#fff}
+.panel p{margin:4px 0 8px;color:#b8c8dc}
+.hint{color:var(--dim)!important;font-size:11px}
+#rail button{display:flex;width:100%;align-items:center;gap:8px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:7px;cursor:pointer;text-align:left;color:var(--dim)}
+#rail button i{font:600 10px var(--mono);width:22px;height:22px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);font-style:normal;flex:none}
+#rail button small{display:block;font:10px var(--mono);color:#6f84a0}
+#rail button:hover{color:#fff;background:rgba(120,165,210,.1)}
+#rail button.on{color:#fff;border-color:rgba(34,230,255,.45);background:rgba(34,230,255,.09)}
+#rail button.on i{background:var(--cy);color:#001318;border-color:var(--cy)}
+#layers{display:grid;gap:3px}
+#layers label{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:6px;cursor:pointer}
+#layers label:hover{background:rgba(120,165,210,.1)}
+#layers input{accent-color:var(--c);margin:0}
+#layers i{width:9px;height:9px;border-radius:2px;background:var(--c);box-shadow:0 0 8px var(--c)}
+input[type=range]{width:100%;accent-color:var(--cy);margin:2px 0}
+.row{display:flex;justify-content:space-between;color:var(--dim);font-size:10.5px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;background:rgba(120,165,210,.08);border-radius:7px;padding:2px}
+.seg button{border:0;background:transparent;padding:4px 2px;border-radius:5px;cursor:pointer;color:var(--dim);font-size:11.5px}
+.seg button.on{background:rgba(34,230,255,.18);color:#fff;box-shadow:inset 0 0 0 1px rgba(34,230,255,.45)}
+.seg.mg button.on{background:rgba(255,43,214,.2);box-shadow:inset 0 0 0 1px rgba(255,43,214,.55)}
+#ovLegend{margin-top:7px;font:10px var(--mono);color:var(--dim)}
+#ovLegend .grad{height:8px;border-radius:4px;margin:3px 0}
+.card{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:8px 0;background:rgba(120,165,210,.045)}
+.card h5{margin:0 0 5px;font-size:12px;color:#fff;display:flex;gap:6px;align-items:center;justify-content:space-between}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:12px}
+.kv dt{color:var(--dim)}
+.kv dd{margin:0;text-align:right;font:11.5px/1.45 var(--mono);color:#e9f2ff}
+.tg{display:inline-block;font:600 9px/1.5 var(--mono);font-style:normal;text-transform:uppercase;letter-spacing:.04em;padding:0 4px;border-radius:3px;margin-left:5px;vertical-align:1px;white-space:nowrap}
+.tg.T{color:var(--cy);background:rgba(34,230,255,.12);box-shadow:inset 0 0 0 1px rgba(34,230,255,.35)}
+.tg.E{color:var(--am);background:rgba(255,176,32,.12);box-shadow:inset 0 0 0 1px rgba(255,176,32,.35)}
+.tg.F{color:var(--gr);background:rgba(61,255,168,.1);box-shadow:inset 0 0 0 1px rgba(61,255,168,.35)}
+.note{font-size:11px;color:#9fb3cc;border-left:2px solid var(--mg);padding-left:7px;margin:6px 0 2px}
+.warn{border-left-color:var(--rd);color:#ffc9bd}
+.meter{margin:5px 0}
+.meter .row{color:#b8c8dc;font-size:11.5px}
+.meter .row b{font:11.5px var(--mono);color:#fff}
+.meter .tr{height:7px;border-radius:4px;background:rgba(120,165,210,.14);overflow:hidden}
+.meter .tr i{display:block;height:100%;border-radius:4px;background:var(--c,var(--cy));transition:width .35s}
+.big{font:600 22px/1.1 var(--mono);color:#fff}
+.big small{font:11px var(--mono);color:var(--dim)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fld{display:grid;gap:2px;font-size:11px;color:var(--dim)}
+.fld select,.fld input[type=number]{background:#0b1321;border:1px solid var(--line);border-radius:6px;padding:4px 6px;color:#fff;width:100%}
+.stack{display:flex;height:12px;border-radius:4px;overflow:hidden;margin:4px 0 6px}
+.stack i{display:block;height:100%}
+.lg{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11px;color:#b8c8dc}
+.lg i.sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;background:var(--c)}
+.lg .tg{margin:0 4px 0 0}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:4px 6px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.item:hover{background:rgba(120,165,210,.1)}
+.item.on{border-color:rgba(255,43,214,.55);background:rgba(255,43,214,.09)}
+.item b{font-weight:500;color:#e6f0ff;font-size:12px}
+.item em{font:11px var(--mono);font-style:normal;color:var(--cy)}
+.item .tr{grid-column:1/-1;height:3px;border-radius:2px;background:rgba(120,165,210,.14)}
+.item .tr i{display:block;height:100%;border-radius:2px;background:var(--c,var(--cy))}
+#hud{position:absolute;left:0;right:0;bottom:0;height:46px;display:flex;align-items:center;gap:14px;padding:0 14px;z-index:14;background:linear-gradient(0deg,rgba(4,6,11,.96),rgba(4,6,11,.5) 75%,transparent);pointer-events:none;font-size:11.5px;color:var(--dim)}
+#fps{font:11px var(--mono);min-width:150px}
+#crumb{margin:0 auto;display:flex;align-items:center;gap:14px;color:#cfe0f5}
+#crumb b{color:#fff}
+#scale{display:flex;align-items:center;gap:6px;font:11px var(--mono);color:#cfe0f5}
+#scale i{display:block;height:6px;border:1px solid var(--cy);border-top:0;width:100px}
+#keys{min-width:150px;text-align:right}
+#tip{position:fixed;z-index:60;left:0;top:0;max-width:330px;pointer-events:none;display:none;padding:8px 10px;border-radius:9px;background:rgba(6,10,18,.96);border:1px solid rgba(34,230,255,.45);box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 18px rgba(34,230,255,.12);font-size:12px}
+#tip h5{margin:0;font-size:13px;color:#fff}
+#tip .s{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+#tip .go{margin-top:6px;color:var(--mg);font-weight:600;font-size:11.5px}
+#veil{position:absolute;inset:0;z-index:12;pointer-events:none;opacity:0;transition:opacity .34s;background:radial-gradient(circle at 50% 50%,rgba(34,230,255,.16),rgba(5,7,13,.97) 62%)}
+#veil.on{opacity:1}
+#dive{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:14;padding:5px 12px;border-radius:999px;border:1px solid rgba(255,43,214,.6);background:rgba(30,4,26,.9);color:#fff;font-size:12px;pointer-events:none;opacity:0;transition:opacity .2s}
+#dive.on{opacity:1}
+#dive i{display:inline-block;width:60px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);vertical-align:middle;margin-left:8px;overflow:hidden}
+#dive i u{display:block;height:100%;background:var(--mg);width:0}
+#fatal{position:absolute;inset:0;z-index:80;display:none;place-items:center;text-align:center;padding:40px;background:rgba(5,7,13,.94)}
+#fatal div{max-width:560px}
+#fatal h2{color:var(--mg)}
+#fatal code{font:12px var(--mono);color:var(--am);white-space:pre-wrap;word-break:break-word}
+body.m-team .lvl-only,body.m-timeline .lvl-only,body.m-ladder .lvl-only,body.m-timeline .lay-only,body.m-ladder .lay-only{display:none}
+body.m-timeline #left,body.m-ladder #left,body.m-timeline #gripL,body.m-ladder #gripL{display:none}
+@media (max-width:1000px){.brand span{display:none}.brand{min-width:0}.tools{min-width:0}.tabs button{padding:6px 8px}#keys{display:none}}
+@media (max-width:760px){#right{width:290px}#gripR{right:300px}.tools .btn,#btnReset{display:none}}
+/* ---------- text section ---------- */
+#doc{max-width:1120px;margin:0 auto;padding:36px 20px 80px;font-size:14px;line-height:1.55}
+#doc h1{font-size:26px;margin:0 0 6px;color:#fff}
+#doc h2{font-size:19px;margin:38px 0 10px;color:#fff;border-bottom:1px solid var(--line);padding-bottom:6px}
+#doc h3{font-size:14px;margin:22px 0 6px;color:var(--cy);letter-spacing:.06em;text-transform:uppercase}
+#doc p,#doc li{color:#c2d0e2}
+#doc .lead{color:var(--dim);margin-top:0}
+#doc table{width:100%;border-collapse:collapse;font-size:13px}
+#doc th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 8px;border-bottom:1px solid var(--line)}
+#doc td{padding:6px 8px;border-bottom:1px solid rgba(120,165,210,.1);vertical-align:top}
+#doc td:nth-child(2){font-family:var(--mono);font-size:12.5px;color:#fff}
+#doc td:nth-child(4){color:#9fb3cc;font-size:12.5px}
+#doc tr:hover td{background:rgba(120,165,210,.05)}
+#doc .tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:rgba(120,165,210,.03)}
+#doc .box{border:1px solid rgba(255,43,214,.45);background:rgba(255,43,214,.06);border-radius:10px;padding:12px 16px;margin:14px 0}
+#doc .box ul{margin:6px 0 0;padding-left:20px}
+#doc dl{display:grid;grid-template-columns:150px 1fr;gap:8px 16px;margin:0}
+#doc dt{font-weight:600;color:#fff}
+#doc dd{margin:0;color:#c2d0e2}
+#doc .tg{font-size:10px}
+#doc .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;color:#c2d0e2}
+@media (max-width:640px){#doc dl{grid-template-columns:1fr;gap:2px}#doc dd{margin-bottom:8px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body class="m-arch">
+<div id="stage">
+  <canvas id="gl" tabindex="0" aria-label="Interactive 3D model of a 2nm-class NPU system"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <header id="topbar">
+    <div class="brand"><b>NPU-2N explorer</b><span>2nm-class · ≈1,000 TOPS · design targets, not a product</span></div>
+    <nav class="tabs" id="modes" aria-label="Mode">
+      <button data-mode="arch" class="on">Architecture</button>
+      <button data-mode="flow">Data-flow</button>
+      <button data-mode="team">Team</button>
+      <button data-mode="timeline">Timeline</button>
+      <button data-mode="ladder">Ladder</button>
+    </nav>
+    <div class="tools">
+      <button id="btnLabels" class="on" title="Toggle labels (L)">Labels</button>
+      <button id="btnReset" title="Reset camera (R)">Reset view</button>
+      <a class="btn" href="#doc">Spec table ↓</a>
+    </div>
+  </header>
+  <aside id="left" class="panel" aria-label="View controls">
+    <section class="lvl-only"><h4>Zoom level</h4><div id="rail"></div>
+      <p class="hint">Click a part marked “→” or keep scrolling in to dive. Scroll out or press Esc to go up.</p></section>
+    <section class="lay-only"><h4>Layers</h4><div id="layers"></div></section>
+    <section class="lvl-only"><h4>Exploded view</h4><input type="range" id="explode" min="0" max="1" step="0.01" value="0" aria-label="Exploded view">
+      <div class="row"><span>assembled</span><span>exploded</span></div></section>
+    <section class="lvl-only"><h4>Overlay</h4>
+      <div class="seg" id="overlay"><button data-ov="off" class="on">Off</button><button data-ov="power">Power</button><button data-ov="heat">Heat</button><button data-ov="util">Util</button></div>
+      <div id="ovLegend"></div></section>
+  </aside>
+  <button class="grip" id="gripL" aria-label="Toggle left panel">‹</button>
+  <aside id="right" class="panel" aria-label="Details"><div id="rp"></div></aside>
+  <button class="grip" id="gripR" aria-label="Toggle right panel">›</button>
+  <div id="dive"></div>
+  <div id="hud">
+    <div id="fps"></div>
+    <div id="crumb"><span id="crumbT"></span><span id="scale"><i></i><span></span></span></div>
+    <div id="keys">drag orbit · right-drag pan · scroll zoom</div>
+  </div>
+  <div id="veil"></div>
+  <div id="fatal"><div><h2>3D view could not start</h2><p id="fatalMsg">This page loads Three.js from the jsDelivr CDN and needs WebGL 2. Check your connection and reload. The spec table and glossary below still work.</p><code id="fatalErr"></code></div></div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<main id="doc">
+  <h1>Spec table, glossary and honesty notes</h1>
+  <p class="lead">Everything the 3D model shows comes from the numbers below. They are generated from the same data the scene uses, so the table and the model cannot drift apart.</p>
+  <div class="box">
+    <b>Read this first.</b> This is a concept study, not a description of any real chip. Each number carries one of three labels:
+    <div class="legend">
+      <span><i class="tg T">target</i> a design goal chosen for this study (or simple arithmetic on such goals)</span>
+      <span><i class="tg E">estimate</i> my engineering estimate or an analyst/press-reported figure; could be off by 2× or more</span>
+      <span><i class="tg F">industry fact</i> published standard, vendor paper or announced specification</span>
+    </div>
+    <ul id="honesty"></ul>
+  </div>
+  <h2>Spec table</h2>
+  <div id="specs"></div>
+  <h2>Glossary</h2>
+  <dl id="gloss"></dl>
+  <noscript><p>JavaScript is required for the 3D model and for rendering the tables.</p></noscript>
+</main>
+
+<script>
+/* Single source of truth for every number on the page (3D scene + tables). */
+(function(){
+const K={cores:32,rows:4,cols:8,N:128,ops:2,f:1e9,tdp:[40,60],tdpNom:50,
+  bwHBM:2.0,bwLP:0.13,capHBM:[72,128],capLP:64,scratchMB:8,l2MB:128,sram:38.1,
+  die:[17.6,13.3],tile:[1.7,2.2],pe:8,vdd:0.7,wafer:30000,
+  // illustrative power model, W: [block, static, at full compute, at full memory stream]
+  pw:[['MAC arrays (32)',1.0,21.0,0],['Core logic: vector / transformer / control (32)',1.2,3.2,0],['Scratchpad SRAM (32 × 8 MB)',1.0,2.0,1.0],['Shared L2 SRAM',0.6,0.6,1.2],['NoC + command processor',0.8,0.8,1.0],['HBM PHYs (2)',0.6,0,4.4],['Memory controllers + encryption',0.3,0,1.2],['HBM stacks (2)',2.0,0,30.0],['UCIe + I/O die',2.0,0.3,0.2],['Clocks, IVR loss, leakage',2.5,1.5,1.0]]};
+K.macs=K.N*K.N; K.topsCore=K.macs*K.ops*K.f/1e12; K.tops8=K.cores*K.topsCore; K.tops4=2*K.tops8; K.topsFp=K.tops8/4;
+K.dieA=K.die[0]*K.die[1]; K.tileA=K.tile[0]*K.tile[1];
+K.pS=K.pw.reduce((a,r)=>a+r[1],0); K.pC=K.pw.reduce((a,r)=>a+r[2],0); K.pM=K.pw.reduce((a,r)=>a+r[3],0);
+K.gross=Math.PI*150*150/K.dieA-Math.PI*300/Math.sqrt(2*K.dieA);
+const PREC={int4:{n:'INT4',b:.5,tops:K.tops4,sp:.75},int8:{n:'INT8',b:1,tops:K.tops8,sp:.625},fp16:{n:'FP16 / BF16',b:2,tops:K.topsFp,sp:.5625}};
+/* Ideal upper-bound throughput: one pass over the weights per step; ignores attention, KV traffic and scheduling loss. */
+function perf(c){
+  const pr=PREC[c.prec],P=c.params*1e9,sp=!!c.sparse,lp=c.mem==='lp';
+  const bytes=P*pr.b*(sp?pr.sp:1),ops=2*P*(sp?.5:1),BW=(lp?K.bwLP:K.bwHBM)*1e12,R=pr.tops*1e12;
+  const n=c.phase==='prefill'?c.prompt:c.batch,tMem=bytes/BW,tCmp=n*ops/R;
+  let t=Math.max(tMem,tCmp),uc=tCmp/t,um=tMem/t;
+  const pStat=K.pS-(lp?1.5:0),dyn=K.pC*uc+K.pM*um*(lp?.1:1),s=Math.min(1,((c.tdp||1e9)-pStat)/dyn);
+  t/=s;uc*=s;um*=s;
+  return{n,bytes,ops,tMem,tCmp,t,uc,um,s,power:pStat+dyn*s,bound:tCmp>=tMem?'compute':'memory',tokps:n/t,perStream:1/t,tops:pr.tops*uc,
+    cross:pr.b*(sp?pr.sp:1)*R/(2*(sp?.5:1)*BW),fits:bytes/1e9<=(lp?K.capLP:K.capHBM[1])};
+}
+const roles=[
+ {id:'arch',n:'Chip architects',hc:[8,15],g:'design',does:'Workload analysis, micro-architecture, PPA trade-offs, the cycle-accurate model and the spec itself.',owns:'Floorplan budget and core micro-architecture',tools:'C++/SystemC simulators, Timeloop/Accelergy-style models, gem5'},
+ {id:'rtl',n:'RTL design',hc:[40,80],g:'design',does:'Writes the hardware: MAC arrays, vector and transformer units, NoC, memory controllers, command processor.',owns:'MAC arrays, vector + transformer units, NoC, controllers',tools:'SystemVerilog, Chisel, lint/CDC, HLS for datapaths'},
+ {id:'dv',n:'Verification (UVM · formal · emulation)',hc:[60,120],g:'design',does:'The largest team. Block and SoC-level UVM, formal proofs for control, NoC and security, emulation running real models before silicon.',owns:'Every block: functional sign-off',tools:'UVM simulators, formal tools, Palladium / ZeBu / Veloce emulators'},
+ {id:'pd',n:'Physical design (floorplan · P&R · sign-off)',hc:[30,60],g:'impl',does:'Turns the netlist into 234 mm² of layout: floorplan, power grid, place & route, timing, IR/EM, DRC/LVS closure.',owns:'The die as a whole, block hardening',tools:'Fusion Compiler / Innovus, PrimeTime / Tempus, RedHawk / Voltus, Calibre'},
+ {id:'dft',n:'DFT & test',hc:[10,20],g:'impl',does:'Scan, compression, memory BIST and repair, test patterns, tester programs, known-good-die strategy.',owns:'Test controller, scan chains, MBIST around 384 MB of SRAM',tools:'Tessent / TestMAX / Modus, ATE programs'},
+ {id:'ams',n:'Analog / mixed-signal (SerDes · PLL · memory PHY)',hc:[20,40],g:'impl',does:'Custom circuits that do not come from synthesis: HBM and UCIe PHYs, PLLs, SerDes, sensors, regulators.',owns:'HBM PHYs, UCIe PHY, PLLs, I/O-die SerDes, IVRs',tools:'Virtuoso / Custom Compiler, SPICE, EM solvers'},
+ {id:'sram',n:'SRAM / memory compiler',hc:[5,10],g:'impl',does:'Selects, tunes and qualifies bit-cells and compiled memories; owns Vmin, repair and ECC strategy.',owns:'32 scratchpads (256 MB) and the 128 MB L2',tools:'Foundry memory compilers, custom macros'},
+ {id:'pkg',n:'Packaging · thermal · SI/PI',hc:[15,30],g:'impl',does:'Interposer and substrate design, HBM integration, signal and power integrity, thermal solution, warpage.',owns:'Interposer, substrate, HBM attach, TIM and cold plate',tools:'Package layout, 3D field solvers, thermal CFD/FEA'},
+ {id:'sw',n:'Compiler · runtime · drivers (MLIR-based)',hc:[40,80],g:'sw',does:'Makes the silicon usable: graph compiler, scheduler, runtime, kernel driver, framework integration, profiling tools.',owns:'Host interface and the command-processor contract',tools:'MLIR/LLVM, IREE/TVM-style stacks, Linux kernel, PyTorch/ONNX front-ends'},
+ {id:'fw',n:'Firmware',hc:[10,20],g:'sw',does:'Boot ROM, secure boot chain, command-processor OS, power/thermal management loops, per-core micro-kernels.',owns:'Command processor, DVFS controller, RISC-V control cores',tools:'C/Rust, RTOS, RISC-V toolchains'},
+ {id:'ml',n:'ML · quantization · model porting',hc:[10,20],g:'sw',does:'Quantises and prunes real models to INT4/INT8/FP8 and 2:4 sparsity, proves accuracy, feeds requirements back to architects.',owns:'Number formats, quant/dequant and sparsity behaviour',tools:'PyTorch, QAT/PTQ toolchains, evaluation harnesses'},
+ {id:'sec',n:'Security',hc:[5,10],g:'design',does:'Threat model, root of trust, secure boot, memory encryption, TEE, side-channel and fault-injection review.',owns:'Security island, memory encryption engines',tools:'Formal security verification, certification labs'},
+ {id:'pm',n:'Foundry liaison · program management',hc:[10,10],g:'biz',does:'PDK versions, shuttle and wafer starts, mask orders, schedule, risk register, supplier management.',owns:'Schedule and the foundry relationship',tools:'Foundry portals, planning tools'},
+ {id:'psv',n:'Post-silicon validation & bring-up',hc:[20,40],g:'impl',does:'First power-on, characterisation across voltage and temperature, debug of silicon escapes, production test correlation.',owns:'First silicon on the bench: the whole card',tools:'Bench + ATE, scopes, BERTs, thermal chambers'},
+ {id:'prod',n:'Product · business · legal / IP licensing',hc:[5,15],g:'biz',est:true,does:'Customers, pricing, roadmap, IP and EDA contracts, export control, patents. Headcount is my assumption; the brief gives none.',owns:'The product definition and all licences',tools:'—'}];
+const ext=[
+ {id:'foundry',n:'Foundry',who:'TSMC · Samsung · Intel Foundry',gives:'PDK, wafer capacity, masks, yield learning, often the 2.5D packaging line too.'},
+ {id:'eda',n:'EDA vendors',who:'Synopsys · Cadence · Siemens EDA',gives:'Simulation, synthesis, place & route, sign-off, emulation hardware.'},
+ {id:'ip',n:'IP vendors',who:'HBM PHY · UCIe · PCIe 6 / CXL · SerDes · RISC-V · foundation IP',gives:'Licensed, silicon-proven hard and soft IP for the target node.'},
+ {id:'hbm',n:'HBM suppliers',who:'SK hynix · Samsung · Micron',gives:'HBM3E / HBM4 stacks. Supply is allocated, not simply bought.'},
+ {id:'osat',n:'OSAT / packaging house',who:'ASE · Amkor · SPIL, or foundry in-house',gives:'2.5D assembly, substrates, final test and system-level test.'}];
+const stages=[
+ {id:'spec',n:'Spec & requirements',a:0,b:3,g:'def',d:'Workloads, PPA targets, interfaces and cost ceiling. Cheap to change now, ruinous later.'},
+ {id:'arch',n:'Architecture exploration',a:1,b:8,g:'def',d:'A cycle-accurate simulator runs real LLM traces and sizes the MAC arrays, SRAM, NoC and HBM bandwidth.'},
+ {id:'rtl',n:'RTL design',a:4,b:17,g:'des',d:'Synthesizable description of every block; frozen in stages (0.5, 0.8, 1.0) so back-end work can start early.'},
+ {id:'dv',n:'Verification & emulation',a:5,b:23.5,g:'des',d:'Runs until tape-out and absorbs the most people. Emulators boot firmware and run real models at kHz-MHz speed.'},
+ {id:'syn',n:'Synthesis + DFT',a:10,b:20,g:'imp',d:'RTL to gates, scan and memory-BIST insertion, early timing and power estimates.'},
+ {id:'pnr',n:'Floorplan · place & route',a:9,b:22,g:'imp',d:'Block hardening, power grid on the backside network, clock tree, routing through 16 metal layers.'},
+ {id:'so',n:'Sign-off',a:19,b:23.5,g:'imp',d:'Timing, power, IR drop, electromigration, DRC and LVS must all close at every corner at once.'},
+ {id:'to',n:'Tape-out (GDSII)',a:23.5,b:24.1,g:'fab',d:'The layout database goes to the foundry. After this, every fix costs masks and months.'},
+ {id:'mask',n:'Mask set',a:23.8,b:25.3,g:'fab',d:'Dozens of masks, 20+ of them EUV (estimate), written and inspected in about 4–8 weeks.'},
+ {id:'fab',n:'Wafer fab',a:24.8,b:29,g:'fab',d:'Hundreds to 1,000+ process steps with EUV exposure; about 3–5 months for first wafers including queue time.'},
+ {id:'pkg',n:'Advanced packaging',a:28.6,b:30.4,g:'fab',d:'Wafer sort, dicing, known-good dies onto the interposer with HBM, underfill, substrate attach.'},
+ {id:'test',n:'Test & binning',a:29,b:32,g:'post',d:'Wafer sort, final test and system-level test; parts are binned by speed and power.'},
+ {id:'bu',n:'Bring-up & validation',a:30.2,b:34.5,g:'post',d:'First power-on, PLL lock, link training, memory training, first inference, then weeks of characterisation.'},
+ {id:'sw',n:'Software enablement',a:6,b:36,g:'sw',d:'Starts on the simulator, moves to emulation, then silicon. A chip without a compiler is a paperweight.'},
+ {id:'vol',n:'Volume production',a:34,b:36,g:'post',d:'Ramp, yield improvement and qualification. A respin (B0) is common and adds about 4–6 months.'}];
+const chal=[
+ {id:'yield',n:'Yield',at:'fab',m:27,d:'234 mm² is a large die for a young node. With 0.1–0.4 defects/cm² (assumption) Poisson yield is about 79–39%, from roughly 258 gross dies per 300 mm wafer.'},
+ {id:'var',n:'Variability',at:'so',m:20.4,d:'Sheet width, thickness and work-function variation widen timing and SRAM Vmin margins, so sign-off needs statistical corners.'},
+ {id:'pd',n:'Power density',at:'pnr',m:14,d:'MAC arrays reach about 0.65–0.75 W/mm² in this model. The floorplan interleaves hot logic with cooler SRAM for that reason.'},
+ {id:'ir',n:'IR drop',at:'so',m:22.4,d:'About 50–70 A at about 0.7 V: each milliohm in the grid costs 50–70 mV, up to 10% of the supply. This is the case for backside power.'},
+ {id:'th',n:'Thermal limits',at:'pkg',m:29.6,d:'Backside power thins the silicon and buries transistors between two metal stacks, so heat spreads less well. Stacked SRAM and HBM (about 95 °C class) share the heat path.'},
+ {id:'sram',n:'SRAM scaling stall',at:'arch',m:5,d:'Bit-cell density grew only about 10–15% into the 2nm class (38.1 Mb/mm² reported). 384 MB of on-die SRAM costs about 81 mm², a third of the die.'},
+ {id:'cost',n:'Mask & EDA cost',at:'mask',m:24.6,d:'A 2nm-class mask set runs to tens of $M (estimate); EDA licences, emulation and compute add tens of $M a year. A respin repeats much of it.'}];
+const cost=[['People: 300–600 × 2.5–3 yr × $0.2–0.35M loaded',150,630],['EDA licences, emulation, compute',30,100],['IP licences (PHYs, SerDes, cores, foundation IP)',15,60],['Mask sets (1–2 full sets)',20,80],['Prototype wafers, packaging, test, lab',20,60]];
+const ladder=[
+ {id:'a',n:'Simulate + open-source RTL',sub:'Architecture simulator · RISC-V · Gemmini · NVDLA',cost:'$0–5k',time:'1–6 months',team:'1–3',does:'Model the accelerator in software, then run open RTL in simulation. Learn where the time and energy really go.',tools:'Chipyard + Gemmini (systolic-array generator), NVDLA, Verilator, cocotb, SCALE-Sim, Timeloop, IREE/TVM/MLIR',gate:'The simulator shows a real PPA win on your target model against a baseline, and you can explain why.'},
+ {id:'b',n:'FPGA prototype',sub:'Run a real quantised model end to end',cost:'$0.3k–15k',time:'3–9 months',team:'1–5',does:'Put the design on an FPGA board and run an actual model. Timing closure, memory interfaces and the compiler all become real problems.',tools:'AMD Zynq UltraScale+ / Kria / Alveo, Vivado, LiteX',gate:'Bit-accurate against the simulator, measured throughput, and a working (even crude) compiler path.'},
+ {id:'c',n:'MPW shuttle on a mature node',sub:'Tiny Tapeout · SkyWater 130 nm · GF 180 nm',cost:'≈ $0.2k–20k',time:'6–12 months (4–6 in fab)',team:'1–5',does:'Tape out a small slice of the design on a shared wafer. A few mm² and a few MHz, but real silicon with real bring-up.',tools:'OpenLane / LibreLane, open PDKs (sky130, gf180mcu, IHP SG13G2), Tiny Tapeout, ChipFoundry, wafer.space',gate:'Working silicon whose measured power and timing match sign-off. You now understand DFT, packaging and bring-up.'},
+ {id:'d',n:'Licensed NPU IP in a mature-node SoC',sub:'Arm Ethos · Cadence Tensilica · Synopsys ARC NPX · CEVA',cost:'≈ $5–50M',time:'18–30 months',team:'30–100',does:'Buy the engine, differentiate on system and software. 28 / 22 / 16 / 12 nm, commercial EDA, a real product.',tools:'Commercial EDA, foundry PDK, licensed NPU and interface IP',gate:'Paying customers, a software stack people use, and volume that justifies a custom engine.'},
+ {id:'e',n:'Custom 2nm-class NPU',sub:'Large funding + foundry partnership',cost:'≈ $0.3–1B+',time:'24–36+ months',team:'300–600',does:'Everything on this page. Only with capital, an experienced team, HBM allocation and a foundry that will take your wafers.',tools:'The full flow shown in Timeline mode',gate:'Foundry allocation, HBM supply, and a balance sheet that survives a respin.'}];
+
+const f0=x=>Math.round(x).toLocaleString('en-US'),f1=x=>x.toLocaleString('en-US',{maximumFractionDigits:1}),f2=x=>x.toLocaleString('en-US',{maximumFractionDigits:2});
+const pf=c=>perf(Object.assign({phase:'decode',params:7,prec:'int4',batch:1,prompt:2048,mem:'hbm',sparse:false},c));
+const hcMin=roles.reduce((a,r)=>a+r.hc[0],0),hcMax=roles.reduce((a,r)=>a+r.hc[1],0);
+const cMin=cost.reduce((a,r)=>a+r[1],0),cMax=cost.reduce((a,r)=>a+r[2],0);
+const sramMM=mb=>mb*8/K.sram;
+const spec=[
+ ['Performance',[
+  ['NPU cores',`${K.cores} (${K.rows} × ${K.cols} grid)`,'T',''],
+  ['MAC array per core',`${K.N} × ${K.N} = ${f0(K.macs)} PEs`,'T','Systolic array; one multiply-accumulate per PE per cycle.'],
+  ['Clock','≈ 1 GHz (1 ns cycle)','T','Assumes the multiplier + adder path closes at 1 ns in a 2nm-class library.'],
+  ['Peak dense INT8',`${K.cores} × ${f0(K.macs)} × 2 ops × 1 GHz = ${f0(K.tops8)} TOPS`,'T','Arithmetic on the targets above. Peak, every PE busy every cycle; not sustained throughput.'],
+  ['Peak INT4',`≈ ${f0(K.tops4)} TOPS`,'T','Assumes each PE splits into two INT4 MACs per cycle.'],
+  ['FP8','≈ INT8 rate','E','Assumes the 8-bit multiplier is shared with an FP8 mantissa path.'],
+  ['FP16 / BF16',`≈ ${f0(K.topsFp)} TOPS`,'E','Assumes 2 × 2 PEs fuse into one wide MAC, i.e. a quarter of the INT8 rate.'],
+  ['2:4 structured sparsity','≤ 2× throughput; weight bytes × 0.625 (INT8)','E','(2 × 8 + 4 index bits) / 32 = 0.625. Only on layers pruned to this pattern.'],
+  ['“Mega-TOPS”',`${f0(K.tops8)} TOPS = ${(K.tops8/1e3).toFixed(2)} × 10¹⁵ ops/s`,'T',`Used loosely. A literal 1,000,000 TOPS needs about ${f0(1e6/K.tops8)} of these chips linked together.`],
+  ['TDP','40–60 W, configurable','T','Includes the HBM stacks. Enforced by DVFS and power capping.'],
+  ['Efficiency',`${f1(K.tops8/40)} / ${f1(K.tops8/50)} / ${f1(K.tops8/60)} TOPS/W at 40 / 50 / 60 W`,'T',`Peak TOPS divided by TDP. The 20+ TOPS/W goal only holds at or below ${f0(K.tops8/20)} W.`],
+  ['Energy budget',`≈ ${f0(50/(K.tops8*1e12)*1e15)} fJ per op, ≈ ${f0(2*50/(K.tops8*1e12)*1e15)} fJ per MAC at 50 W`,'T','All-in: arithmetic, clocks, SRAM, NoC, memory, leakage.'],
+  ['INT8 MAC datapath energy','≈ 30–50 fJ','E','Scaled from published 7 nm arithmetic energy figures. Uses up to half of the budget above.'],
+  ['Core supply current',`≈ ${f0(50/K.vdd)} A at ≈ ${K.vdd} V and 50 W`,'E',''],
+  ['Hotspot power density','≈ 0.65–0.75 W/mm² (MAC arrays)','E','From the power model below: 21 W over 32 × 1.04 mm².']]],
+ ['LLM workloads (ideal upper bounds)',[
+  ['Model size','7B–70B parameters','T','Vision, speech and multimodal models are smaller and fit the same engine.'],
+  ['Weights in memory','3.5 GB (7B INT4) · 35 GB (70B INT4) · 70 GB (70B INT8)','T','Parameters × bytes per parameter.'],
+  ['Decode, batch 1',`≤ ${f0(pf({}).tokps)} tok/s (7B INT4) · ≤ ${f0(pf({params:70}).tokps)} (70B INT4) · ≤ ${f0(pf({params:70,prec:'int8'}).tokps)} (70B INT8)`,'E','Memory bandwidth ÷ weight bytes at 2 TB/s. Ignores KV-cache reads, which grow with context length.'],
+  ['MAC utilisation in batch-1 decode',`≈ ${(pf({prec:'int8'}).uc*100).toFixed(2)}%`,'E','The arrays could use 16.4 TB/s of fresh weights per core; HBM delivers 0.06. Decode is memory-bound.'],
+  ['Compute / memory crossover',`≈ ${f0(pf({prec:'int8'}).cross)} sequences or prompt tokens`,'E','INT8 at 2 TB/s. Above this, compute is the limit; below it, memory is.'],
+  ['Prefill, 2,048-token prompt',`≥ ${f0(pf({phase:'prefill',prec:'int8'}).t*1e3)} ms (7B) · ≥ ${f0(pf({phase:'prefill',prec:'int8',params:70}).t*1e3)} ms (70B), INT8`,'E','Compute-bound. Ignores attention cost, which grows with the square of prompt length.'],
+  ['LPDDR6 edge variant, decode',`≤ ${f0(pf({mem:'lp'}).tokps)} tok/s (7B INT4)`,'E','Same engine starved by a ≈ 0.13 TB/s memory.']]],
+ ['Memory hierarchy',[
+  ['PE pipeline registers',`${f1(K.macs*2*K.f/1e12)} TB/s per core`,'T','16,384 PEs × 2 bytes per cycle. Derived from the targets.'],
+  ['Array edge intake','256 GB/s per core','T','128 weight bytes + 128 activation bytes per cycle.'],
+  ['Local scratchpad SRAM',`${K.scratchMB} MB per core (range 4–8), 256 GB/s`,'T','Two 1,024-bit ports at 1 GHz.'],
+  ['Shared L2 SRAM',`${K.l2MB} MB (range 64–128), ≈ 2.05 TB/s`,'T','Two 64 MB banks, 32 ports × 512 bit at 1 GHz.'],
+  ['3D-stacked SRAM (optional)','≈ 256 MB, ≈ 2 TB/s','E','Hybrid-bonded die on an older node. Sits in the heat path.'],
+  ['HBM (high-end variant)',`2 stacks, ≥ ${K.bwHBM} TB/s aggregate, ${K.capHBM[0]}–${K.capHBM[1]} GB`,'T','The model uses 2.0 TB/s sustained.'],
+  ['HBM3E, per stack','1,024 I/O, ≈ 9.2–9.8 Gb/s per pin, ≈ 1.2 TB/s, 36 GB (12-high)','F','Vendor figures.'],
+  ['HBM4, per stack','2,048 I/O, up to 8 Gb/s per pin, up to 2 TB/s, up to 64 GB (16-high)','F','JEDEC JESD270-4, April 2025.'],
+  ['HBM energy',`≈ 1.9 pJ/bit assumed → ${f0(K.pM-10)} W for the stacks at 2 TB/s`,'E','Published HBM2-era figures are near 3.9 pJ/bit. At 3 pJ/bit the stacks alone would draw 48 W.'],
+  ['LPDDR6 (edge variant)','≈ 0.11–0.15 TB/s (4 channels)','E','LPDDR6 itself is JEDEC JESD209-6 (July 2025); the channel count and rate here are assumptions.'],
+  ['On-die SRAM total',`${f0(K.cores*K.scratchMB+K.l2MB)} MB ≈ ${f0(sramMM(K.cores*K.scratchMB+K.l2MB))} mm²`,'E',`At ${K.sram} Mb/mm². ECC, repair and periphery make real arrays larger.`],
+  ['HD SRAM macro density',`${K.sram} Mb/mm²`,'F','Reported for 2nm-class nanosheet processes at ISSCC 2025.']]],
+ ['Die, process and device',[
+  ['Process','2nm-class GAA nanosheet, EUV, backside power','T','TSMC N2 / Samsung SF2 / Intel 18A style.'],
+  ['Backside power availability','Intel 18A (PowerVia), TSMC A16 (Super Power Rail), Samsung SF2Z','F','TSMC’s base N2 keeps power on the front side, so this target is closest to 18A / A16 / SF2Z.'],
+  ['Compute die',`${K.die[0]} × ${K.die[1]} mm ≈ ${f0(K.dieA)} mm²`,'E','From the floorplan in the model.'],
+  ['NPU core tile',`${K.tile[0]} × ${K.tile[1]} mm = ${f2(K.tileA)} mm²; 32 tiles ≈ ${f0(32*K.tileA)} mm²`,'E',''],
+  ['MAC array',`1.02 × 1.02 mm ≈ 1.04 mm² per core`,'E','≈ 64 µm² per PE.'],
+  ['MAC PE',`≈ ${K.pe} × ${K.pe} µm, ≈ 8,000 transistors`,'E',''],
+  ['Transistor count','≈ 30 billion','E','≈ 18 B in SRAM (6 per bit), ≈ 4 B in MAC arrays, the rest in logic and PHYs.'],
+  ['Gate pitch / gate length','≈ 48 nm / ≈ 12 nm','E','Analyst-reported class values, not foundry-confirmed.'],
+  ['Nanosheets','3 per device, ≈ 5–6 nm thick, ≈ 15–45 nm wide','E','Typical published ranges.'],
+  ['Metal stack','16 front-side layers (range 15–20) + 3 backside','T','Lowest ≈ 8 layers EUV-patterned at ≈ 20–44 nm pitch (estimate).'],
+  ['EUV lithography','13.5 nm wavelength, 0.33 NA; high-NA is 0.55','F',''],
+  ['Lithography field','26 × 33 mm = 858 mm²','F','The interposer in this model is larger than one field and must be stitched.']]],
+ ['Package, I/O and card',[
+  ['Package','2.5D: compute die + I/O die + 2 HBM stacks on a silicon interposer','T',''],
+  ['Interposer','≈ 44 × 23.5 mm ≈ 1,034 mm²','E',''],
+  ['I/O die','≈ 10 × 6 mm on N5/N6','E','SerDes and analog gain little from 2 nm and cost far less on an older node.'],
+  ['UCIe die-to-die link','4 modules × 64 lanes × 32 GT/s ≈ 8.2 Tb/s ≈ 1 TB/s per direction','T','Raw rate.'],
+  ['UCIe standard','Up to 32 GT/s (UCIe 2.0); 48 and 64 GT/s added in UCIe 3.0; 25–55 µm bump pitch (advanced package)','F','UCIe 3.0 was released in August 2025.'],
+  ['Host interface','PCIe 6.0 x16: 64 GT/s per lane, ≈ 128 GB/s raw per direction','F','16 × 64 Gb/s = 1,024 Gb/s. CXL 3.x runs on the same PHY.'],
+  ['Chip-to-chip links','16 lanes × 112 Gb/s ≈ 1.8 Tb/s','T','For multi-NPU scaling.'],
+  ['Hybrid bonding pitch','≤ 9 µm','F','As shipped in 3D-stacked cache products.'],
+  ['Bump pitches','micro-bump ≈ 40–55 µm · C4 ≈ 130–150 µm · BGA ≈ 1.0–1.27 mm','E','Typical values; drawn sparser in the model.'],
+  ['Card','PCIe FHHL 167.65 × 111.15 mm, single slot','F','Form-factor dimensions.'],
+  ['Slot power','≤ 75 W from an x16 slot','F','So a 40–60 W card needs no auxiliary power connector.'],
+  ['Cooling budget','≲ 1 °C/W junction to inlet air','E','(95 °C − 45 °C) ÷ 50 W.']]],
+ ['Power model used for overlays (illustrative)',K.pw.map(r=>[r[0],`${f1(r[1])} W idle · +${f1(r[2])} W at full compute · +${f1(r[3])} W at full memory stream`,'E','']).concat([
+  ['Total',`${f1(K.pS)} W idle + ${f1(K.pC)} W × compute use + ${f1(K.pM)} W × memory use`,'E','My assumptions, tuned so full dense INT8 lands near 50 W. Not a measurement or a simulation.'],
+  ['Thermal overlay','coolant-side 45 °C + 0.25 °C/W × total + local term from blurred power density','E','A picture of where heat concentrates, not CFD or FEA.']])],
+ ['Team',roles.map(r=>[r.n,r.hc[0]===r.hc[1]?`${r.hc[0]}`:`${r.hc[0]}–${r.hc[1]}`,'E',r.est?'My assumption; the brief gives no number.':'']).concat([['Total',`${hcMin}–${hcMax} people`,'E','Ballpark for a full-custom 2nm program. Real programs vary widely with IP reuse.']])],
+ ['Program',[
+  ['Schedule','24–36+ months spec to volume; 34 months drawn','E','24 months only for a derivative design with heavy reuse. A respin adds about 4–6 months.'],
+  ['Wafer fab cycle','≈ 3–5 months','E','Hundreds to 1,000+ process steps.'],
+  ['Total program cost',`≈ $${(cMin/1e3).toFixed(2)}–${(cMax/1e3).toFixed(2)} billion`,'E','Sum of the rows below. Order of magnitude only.']].concat(cost.map(r=>[r[0],`$${r[1]}–${r[2]}M`,'E',''])).concat([
+  ['Analyst reference','≈ $725M to design a large 2nm chip','E','International Business Strategies estimate, 2023, as reported in the trade press.'],
+  ['Wafer price',`≈ $${f0(K.wafer)} per 300 mm wafer`,'E','Press-reported, not confirmed by the foundry.'],
+  ['Gross dies per wafer',`≈ ${f0(K.gross)}`,'E',`Standard die-per-wafer formula for ${f0(K.dieA)} mm².`],
+  ['Yield','≈ 39–79%','E','Poisson model, 0.4–0.1 defects/cm² (assumption).'],
+  ['Compute die cost',`≈ $${f0(K.wafer/(K.gross*.79))}–${f0(K.wafer/(K.gross*.39))} per good die`,'E','Before HBM, interposer, packaging and test, which together cost more than the die.']])],
+ ['Reality-check ladder',ladder.map(s=>[`(${s.id}) ${s.n}`,`${s.cost} · ${s.time} · team ${s.team}`,'E','Shuttle and board prices change; check current listings.'])]];
+const gloss=[
+ ['NPU','Neural processing unit. A processor built for the arithmetic of neural networks, mostly huge numbers of multiply-accumulate operations, rather than general-purpose code.'],
+ ['TOPS','Trillions of operations per second. Usually counted as 2 operations (one multiply, one add) per MAC at a stated precision. A peak figure; it says nothing about memory limits or real model speed.'],
+ ['MAC','Multiply-accumulate: a × w + acc. The basic operation of a neural network layer, and the unit the compute array is built from.'],
+ ['Systolic array','A grid of identical processing elements where data moves one neighbour per clock tick, like a heartbeat. Here activations flow west to east and weights north to south.'],
+ ['GAA','Gate-all-around. The transistor gate wraps the channel on every side. In 2nm-class processes the channel is a stack of thin silicon nanosheets.'],
+ ['BSPDN','Backside power delivery network. Power rails are built on the back of the wafer, leaving the front-side metal for signals and reducing voltage drop.'],
+ ['EUV','Extreme ultraviolet lithography, 13.5 nm light, used to print the smallest layers of a chip.'],
+ ['NoC','Network-on-chip. On-die routers and links, here a 2D mesh, that carry data between cores, memories and controllers.'],
+ ['HBM','High-bandwidth memory. DRAM dies stacked and connected by through-silicon vias, placed next to the processor on an interposer.'],
+ ['UCIe','Universal Chiplet Interconnect Express. An open standard for die-to-die links inside a package.'],
+ ['DVFS','Dynamic voltage and frequency scaling. Lowering supply voltage and clock rate at run time to trade speed for power.'],
+ ['Tape-out','The moment the finished layout is released to the foundry for mask making. The point of no (cheap) return.'],
+ ['GDSII','The file format (now often OASIS) in which a chip layout is delivered: polygons on layers.'],
+ ['MPW','Multi-project wafer. Many small designs share one mask set and wafer run, cutting prototype cost by orders of magnitude.']];
+const honesty=[
+ 'The targets are mutually tight. 1,049 TOPS inside 50 W leaves about 95 fJ per MAC for everything; the arithmetic alone plausibly takes 30–50 fJ.',
+ 'Full-rate HBM streaming may not fit the power budget. At 2 TB/s the two stacks draw roughly 30–60 W depending on energy per bit, which is the whole TDP. The model assumes the optimistic end and throttles under the cap.',
+ 'TOPS is a peak number. In single-stream LLM decode the MAC arrays are under 1% busy because memory bandwidth, not compute, sets the speed.',
+ 'Area figures use the best reported SRAM macro density and analyst-reported pitches. A real floorplan would be larger.',
+ 'Vertical dimensions in the package view are exaggerated, and the transistor view is schematic rather than to scale.',
+ 'Team size, schedule and cost are ballparks. Published program costs are themselves estimates and differ by a factor of two or more.'];
+window.NPU={K,PREC,perf,roles,ext,stages,chal,cost,ladder,spec,gloss,hcMin,hcMax,cMin,cMax,f0,f1,f2};
+const TAG={T:'target',E:'estimate',F:'industry fact'};
+document.getElementById('specs').innerHTML=spec.map(([g,rows])=>`<h3>${g}</h3><div class="tw"><table><thead><tr><th style="width:25%">Parameter</th><th style="width:33%">Value</th><th style="width:11%">Basis</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td><i class="tg ${r[2]}">${TAG[r[2]]}</i></td><td>${r[3]}</td></tr>`).join('')}</tbody></table></div>`).join('');
+document.getElementById('gloss').innerHTML=gloss.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
+document.getElementById('honesty').innerHTML=honesty.map(h=>`<li>${h}</li>`).join('');
+window.addEventListener('error',e=>{if(!window.__npuReady){const f=document.getElementById('fatal');f.style.display='grid';document.getElementById('fatalErr').textContent=String(e.message||e.error||'');}});
+setTimeout(()=>{if(!window.__npuReady)document.getElementById('fatal').style.display='grid';},15000);
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const NPU=window.NPU,{K,perf,roles,ext,stages,chal,cost,ladder,f0,f1,f2}=NPU;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const stage=$('#stage'),canvas=$('#gl');
+const COL={cy:0x22e6ff,mg:0xff2bd6,am:0xffb020,gr:0x3dffa8,rd:0xff5a3c,vi:0xa78bfa,bl:0x5b8cff,wh:0xdfeaff};
+const LAYERS={compute:['Compute',COL.cy],memory:['Memory',COL.mg],power:['Power & clock',COL.am],thermal:['Thermal',COL.rd],io:['I/O & interconnect',COL.gr],security:['Security',COL.vi]};
+const hex=c=>'#'+c.toString(16).padStart(6,'0');
+const state={mode:'arch',level:0,core:13,labels:true,overlay:'off',sel:null,
+  layers:{compute:true,memory:true,power:true,thermal:true,io:true,security:true},
+  flow:{phase:'prefill',params:7,prec:'int8',batch:1,prompt:2048,mem:'hbm',sparse:false,tdp:50},
+  role:null,stg:null,step:0,tl:{m:0,play:true}};
+
+/* ================= renderer, scene, camera ================= */
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+let pxr=Math.min(window.devicePixelRatio||1,2);renderer.setPixelRatio(pxr);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+const MAXA=renderer.capabilities.getMaxAnisotropy();
+const scene=new THREE.Scene();
+function tex(w,h,draw,o={}){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=MAXA;if(o.rep){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(o.rep[0],o.rep[1]);}return t;}
+scene.background=tex(16,512,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#0b1730');gr.addColorStop(.5,'#070c18');gr.addColorStop(1,'#03050a');g.fillStyle=gr;g.fillRect(0,0,w,h);});
+{const pm=new THREE.PMREMGenerator(renderer);scene.environment=pm.fromScene(new RoomEnvironment(),.04).texture;scene.environmentIntensity=.42;pm.dispose();}
+scene.add(new THREE.HemisphereLight(0xa9cdff,0x0a0f18,1.0));
+{const k=new THREE.DirectionalLight(0xffffff,2.4);k.position.set(30,55,25);scene.add(k);
+ const c=new THREE.DirectionalLight(COL.cy,1.1);c.position.set(-45,18,-30);scene.add(c);
+ const m=new THREE.DirectionalLight(COL.mg,.8);m.position.set(35,10,-45);scene.add(m);}
+const camera=new THREE.PerspectiveCamera(36,1,.1,3000);camera.position.set(8,18,30);
+const controls=new OrbitControls(camera,canvas);
+Object.assign(controls,{enableDamping:true,dampingFactor:.1,zoomSpeed:2.2,zoomToCursor:true,screenSpacePanning:true,minPolarAngle:.04*Math.PI,maxPolarAngle:.96*Math.PI});
+const grid=new THREE.GridHelper(400,200,0x16395c,0x0c1f36);grid.material.transparent=true;grid.material.opacity=.55;grid.material.depthWrite=false;scene.add(grid);
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+
+/* ================= building helpers ================= */
+const BOX=new THREE.BoxGeometry(1,1,1),EDGE=new THREE.EdgesGeometry(BOX);
+// same box with the top face as its own material group, so textured tops cost 2 draws instead of 6
+const BOX2=BOX.clone();{const i=Array.from(BOX.index.array);BOX2.setIndex(i.slice(0,12).concat(i.slice(18),i.slice(12,18)));BOX2.clearGroups();BOX2.addGroup(0,30,0);BOX2.addGroup(30,6,1);}
+const mcache=new Map(),lcache=new Map();
+function M(color,o={}){const k=color+JSON.stringify(o);let m=mcache.get(k);if(!m){m=new THREE.MeshStandardMaterial({color,metalness:o.m??.25,roughness:o.r??.55,emissive:o.e??0,emissiveIntensity:o.ei??1,transparent:o.o!==undefined,opacity:o.o??1,depthWrite:o.o===undefined});mcache.set(k,m);}return m;}
+function MT(map,o={}){return new THREE.MeshStandardMaterial({map,metalness:o.m??.2,roughness:o.r??.6,emissive:o.e??0x000000,emissiveMap:o.e?map:null,emissiveIntensity:o.ei??1});}
+function LM(color,op=.5){const k=color+'|'+op;let m=lcache.get(k);if(!m){m=new THREE.LineBasicMaterial({color,transparent:true,opacity:op});lcache.set(k,m);}return m;}
+function GL(color,op){return new THREE.MeshBasicMaterial({color,transparent:op!==undefined,opacity:op??1,depthWrite:op===undefined});}
+function box(p,w,h,d,x,y,z,mat,ed,geo){const m=new THREE.Mesh(geo||BOX,mat);m.scale.set(w,h,d);m.position.set(x,y,z);p.add(m);if(ed)m.add(new THREE.LineSegments(EDGE,LM(ed===true?COL.cy:ed,.5)));return m;}
+function boxT(p,w,h,d,x,y,z,side,top,ed){return box(p,w,h,d,x,y,z,[side,top],ed,BOX2);}
+function grp(p,x=0,y=0,z=0){const g=new THREE.Group();g.position.set(x,y,z);p.add(g);return g;}
+function inst(p,geo,mat,list){const im=new THREE.InstancedMesh(geo,mat,list.length),m=new THREE.Matrix4();list.forEach((a,i)=>{m.makeScale(a[3]??1,a[4]??1,a[5]??1);m.setPosition(a[0],a[1],a[2]);im.setMatrixAt(i,m);});im.userData.nopick=true;p.add(im);return im;}
+function line(p,pts,color,op=.6){const g=new THREE.BufferGeometry().setFromPoints(pts.map(a=>a.isVector3?a:new THREE.Vector3(a[0],a[1],a[2])));const l=new THREE.Line(g,LM(color,op));p.add(l);return l;}
+const rnd=(s=>()=>{s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;})(20260711);
+
+const VIEWS={};let B=null,cur=null;
+function view(key,o){const v=Object.assign({key,scale:1,explode:0,parts:[],picks:[],movers:[],layered:[],labels:[],flows:[],ticks:[],group:new THREE.Group()},o);v.group.scale.setScalar(v.scale);v.group.visible=false;scene.add(v.group);VIEWS[key]=v;B=v;return v;}
+function mover(o,ex){o.userData.ex=new THREE.Vector3(ex[0],ex[1],ex[2]);o.userData.base=o.position.clone();B.movers.push(o);return o;}
+function lay(o,layer,cond){B.layered.push({obj:o,layer,cond});return o;}
+function label(o,lb,p={}){const l={obj:o,text:lb[0],sub:lb[1]||'',pri:lb[2]??5,add:lb[3],cls:lb[4]||'',layer:p.layer,col:p.col};if(p.drill!==undefined&&!/sm/.test(l.cls)){l.cls+=' go';l.text+=' → L'+p.drill;l.pri+=2;}B.labels.push(l);return l;}
+/* Register an object (mesh or group) as a hoverable, labelled part. Register inner parts before their parent group. */
+function part(o,p){p.obj=o;p.view=B;o.userData.part=p;B.parts.push(p);
+  o.traverse(c=>{if(c.isMesh&&!c.userData.pr&&(!c.userData.nopick||p.inst)){c.userData.pr=p;B.picks.push(c);}});
+  if(p.layer)lay(o,p.layer,p.cond);if(p.ex)mover(o,p.ex);if(p.lb)p.label=label(o,p.lb,p);return o;}
+function finalize(v){v.group.visible=true;v.group.updateMatrixWorld(true);const b=new THREE.Box3(),c=new THREE.Vector3();
+  for(const l of v.labels){b.setFromObject(l.obj);l.obj.getWorldPosition(c);l.off=new THREE.Vector3((b.min.x+b.max.x)/2-c.x,b.max.y-c.y,(b.min.z+b.max.z)/2-c.z);if(l.add)l.off.add(new THREE.Vector3(...l.add).multiplyScalar(v.scale));}
+  for(const p of v.parts){b.setFromObject(p.obj);p.rad=b.getSize(c).length()/2;p.obj.getWorldPosition(c);p.coff=b.getCenter(new THREE.Vector3()).sub(c);}
+  v.dir=new THREE.Vector3(...v.cam).sub(new THREE.Vector3(...v.tgt));v.dist=v.dir.length();v.dir.normalize();v.minD=v.minD??v.dist*.34;v.maxD=v.maxD??v.dist*2.3;
+  v.group.visible=false;}
+const _c=new THREE.Vector3();
+const centerOf=p=>p.obj.getWorldPosition(new THREE.Vector3()).add(p.coff);
+const shown=o=>{for(;o;o=o.parent)if(!o.visible)return false;return true;};
+const tagH=t=>t?`<i class="tg ${t}">${{T:'target',E:'estimate',F:'fact'}[t]}</i>`:'';
+function tipHTML(p,pinned){const t=p.tip||{};return `<h5>${t.t||p.name}</h5><div class="s">${t.s||(p.layer?LAYERS[p.layer][0]:'Structure')}</div>`+
+  (t.r?`<dl class="kv">${t.r.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}${tagH(r[2])}</dd>`).join('')}</dl>`:'')+(t.n?`<div class="note">${t.n}</div>`:'')+
+  (p.drill!==undefined&&!pinned?`<div class="go">Click to dive → L${p.drill}</div>`:'');}
+
+/* ================= floorplan data (mm, die-centred, +x east, +z south) ================= */
+const KIND={mac:[0x0c7892,COL.cy],sram:[0x86207a,COL.mg],l2:[0x9a2686,COL.mg],logic:[0x1f4f86,COL.cy],phy:[0x178a58,COL.gr],ctl:[0x1c6b7a,COL.gr],sec:[0x5f48b8,COL.vi],pwr:[0x94690f,COL.am],dft:[0x41526b,COL.wh],misc:[0x1b2536,0x44607f]};
+const CORE={W:K.tile[0],H:K.tile[1],sub:[
+ {id:'sp',n:'Local scratchpad SRAM',kind:'sram',layer:'memory',u:[.05,1.65],v:[1.10,2.15],h:.045},
+ {id:'mac',n:'128 × 128 systolic MAC array',kind:'mac',layer:'compute',u:[.05,1.07],v:[.05,1.07],h:.07},
+ {id:'vu',n:'Vector unit',kind:'logic',layer:'compute',u:[1.12,1.65],v:[.79,1.07],h:.055},
+ {id:'tfu',n:'Transformer-function unit',kind:'logic',layer:'compute',u:[1.12,1.65],v:[.58,.77],h:.055},
+ {id:'qdq',n:'Quant / dequant',kind:'logic',layer:'compute',u:[1.12,1.38],v:[.37,.56],h:.05},
+ {id:'rv',n:'RISC-V control core',kind:'logic',layer:'compute',u:[1.40,1.65],v:[.37,.56],h:.05},
+ {id:'spd',n:'Sparsity decoder (2:4)',kind:'logic',layer:'compute',u:[1.12,1.38],v:[.20,.35],h:.05},
+ {id:'dma',n:'DMA engine',kind:'ctl',layer:'io',u:[1.40,1.65],v:[.20,.35],h:.05},
+ {id:'rt',n:'NoC router',kind:'ctl',layer:'io',u:[1.12,1.38],v:[.05,.18],h:.05},
+ {id:'pg',n:'Power gating · clock · sensors',kind:'pwr',layer:'power',u:[1.40,1.65],v:[.05,.18],h:.05}]};
+CORE.sub.forEach(s=>{s.a=(s.u[1]-s.u[0])*(s.v[1]-s.v[0]);});CORE.by=Object.fromEntries(CORE.sub.map(s=>[s.id,s]));
+const FP={W:K.die[0],D:K.die[1],blocks:[],cores:[],by:{}};
+{const rowZ=[[-5.45,-3.25],[-3.25,-1.05],[1.05,3.25],[3.25,5.45]];
+ for(let r=0;r<4;r++)for(let k=0;k<8;k++){const x0=-6.8+k*1.7,[zN,zS]=rowZ[r],north=r%2===0,mapV=v=>north?zN+v:zS-v;
+  FP.cores.push({id:r*8+k,r,k,x0,zN,zS,cx:x0+.85,cz:(zN+zS)/2,north,mapV,rect:(u,v)=>({x:x0+(u[0]+u[1])/2,z:mapV((v[0]+v[1])/2),w:u[1]-u[0],d:v[1]-v[0]})});}
+ const fb=(id,name,kind,layer,x,z,w,d,h,tip,lb)=>{const b={id,name,kind,layer,x,z,w,d,h,tip,lb};FP.blocks.push(b);FP.by[id]=b;return b;};
+ for(const s of[-1,1]){const W=s<0?'west':'east',w=s<0?'W':'E';
+  fb('phy'+w,`HBM PHY (${W})`,'phy','memory',s*8.05,0,1.3,9,.2,{s:'Memory I/O · analog / mixed-signal',r:[['Interface','1,024 DQ (HBM3E) or 2,048 DQ (HBM4) per stack','F'],['Stack rate','HBM3E ≈ 1.2 TB/s · HBM4 ≤ 2 TB/s','F'],['Design target','≥ 1 TB/s sustained per side','T'],['Area','1.3 × 9.0 mm ≈ 11.7 mm²','E']],n:'Shoreline-limited: the PHY has to sit on the die edge that faces its HBM stack across the interposer.'},['HBM PHY','≥ 1 TB/s',7]);
+  fb('mc'+w,`HBM memory controller (${W})`,'ctl','memory',s*7.15,-.6,.5,7.8,.2,{r:[['Does','read/write scheduling, ECC, link training, refresh',null],['Feeds','4 row trunks × 2,048 bit × 1 GHz ≈ 1.02 TB/s','T'],['Area','0.5 × 7.8 mm ≈ 3.9 mm²','E']]},['Mem ctrl','',4]);
+  fb('mee'+w,`Memory encryption engine (${W})`,'sec','security',s*7.15,3.95,.5,1.1,.24,{r:[['Cipher','AES-XTS-256 inline, per-tenant keys','T'],['Throughput','≥ 1 TB/s per side, to match HBM','T'],['Latency','+1–2 cycles','E']],n:'Everything stored in HBM is ciphertext. Keys never leave the root of trust.'},['Mem encryption','AES-XTS',5]);
+  fb('l2'+w,`Shared L2 SRAM bank (${W})`,'l2','memory',s*3.6,0,6.4,2.1,.16,{r:[['Capacity','2 banks × 64 MB = 128 MB (range 64–128)','T'],['Bandwidth','32 ports × 512 bit × 1 GHz ≈ 2.05 TB/s total','T'],['Area','6.4 × 2.1 mm = 13.4 mm² per bank','E'],['Holds','hot KV-cache pages, activations, weight tiles in transit',null]],n:'Area uses 38.1 Mb/mm², the reported 2nm-class macro density. ECC, repair and periphery make real arrays larger.'},['L2 SRAM · 64 MB','≈ 1 TB/s per bank',8]);
+  fb('ivr'+w,`Integrated voltage regulator bank (north-${W})`,'pwr','power',s*4.1,-6.05,4,.9,.2,{r:[['Stage','on-die / in-package second stage after the card VRM','T'],['Load','≈ 50–70 A at ≈ 0.7 V','E'],['Why','fast DVFS steps, less I²R loss; feeds the backside power network',null],['Efficiency','≈ 88–92%','E']]},['IVR bank','≈ 0.7 V',5]);
+  fb('pll'+w,`PLL (${W})`,'pwr','power',s*6.5,-6.05,.6,.9,.2,{r:[['Outputs','≈ 1 GHz core clock, PHY reference clocks','T'],['Count','3 on the compute die','E'],['Jitter-critical for','HBM PHY and UCIe sampling',null]]},['PLL','',3]);
+  fb('cnr'+w+'n','Decap · ESD · pad-ring corner','misc','power',s*7.8,-5.58,1.8,1.95,.08,{r:[['Contents','decoupling capacitance, ESD clamps, seal ring',null]]});
+  fb('cnr'+w+'s','Decap · ESD · pad-ring corner','misc','power',s*7.8,5.58,1.8,1.95,.08,{r:[['Contents','decoupling capacitance, ESD clamps, seal ring',null]]});}
+ fb('cmd','Command processor + scheduler','logic','compute',0,-.56,.76,.9,.26,{r:[['Role','takes the host command queue, splits the model graph across 32 cores, places KV-cache pages',null],['Cores','4 RISC-V application cores','E'],['Area','≈ 0.7 mm²','E']],n:'KV-cache aware: hot pages stay in L2 or stacked SRAM, cold pages go to HBM.'},['Command processor','+ scheduler',8]);
+ fb('sec','Security island','sec','security',0,.2,.76,.5,.22,{r:[['Root of trust','immutable boot ROM, key vault (PUF/OTP), TRNG','T'],['Secure boot','signed, measured firmware chain from the card flash','T'],['TEE','isolated tenants, per-context keys, remote attestation','T'],['Crypto','AES / SHA / ECC engines','E'],['Area','≈ 0.4 mm²','E']]},['Root of trust · TEE','secure boot',7]);
+ fb('pmu','DVFS / power-management controller','pwr','power',0,.76,.76,.5,.18,{r:[['DVFS','33 voltage-frequency islands (32 cores + shared)','T'],['Power gating','per core, per MAC-array quadrant, per SRAM bank','T'],['Inputs','≈ 40 on-die thermal, droop and process sensors','E'],['Power cap','40–60 W, set by firmware','T']]},['DVFS controller','40–60 W cap',6]);
+ fb('dft','DFT / test controller','dft','compute',-1.2,-6.05,1.6,.9,.16,{s:'Test',r:[['Contents','JTAG/IJTAG, scan compression, memory BIST and repair for 384 MB of SRAM',null],['Why it matters','test time and yield learning at 2 nm; dies must be known-good before HBM is attached',null]]},['DFT / test','',4]);
+ fb('sens','PVT / thermal sensor hub','pwr','power',.2,-6.05,1,.9,.16,{r:[['Sensors','≈ 40 thermal diodes plus droop and process monitors','E'],['Used by','DVFS loop, thermal throttling, ageing guard-band',null]]},['Sensor hub','',4]);
+ fb('clk','Clock root + PLL','pwr','power',1.4,-6.05,1.2,.9,.18,{r:[['Does','clock mesh root, dividers, glitch-free muxing for DVFS','T']]},['Clock root','≈ 1 GHz',4]);
+ fb('ucie','UCIe-A PHY (die-to-die)','phy','io',0,6.05,9,1,.2,{r:[['Config','4 modules × 64 lanes','T'],['Rate','32 GT/s per lane ≈ 8.2 Tb/s ≈ 1 TB/s per direction, raw','T'],['Standard','≤ 32 GT/s in UCIe 2.0; 48 / 64 GT/s added in UCIe 3.0','F'],['Bump pitch','25–55 µm (advanced package)','F'],['Area','≈ 9 × 1 mm','E']]},['UCIe-A PHY','≈ 1 TB/s per direction',7]);
+ fb('d2d','Die-to-die adapter + protocol bridge','ctl','io',-5.7,6.05,2.2,1,.18,{r:[['Carries','PCIe 6.0 / CXL 3.x streams and sideband over UCIe','T'],['Does','CRC and retry, lane repair, flit packing',null]]},['D2D adapter','',4]);
+ fb('otp','eFuse / OTP + debug authentication','sec','security',5.7,6.05,2.2,1,.16,{r:[['Holds','lifecycle state, device identity, key hashes','T'],['Debug','JTAG unlock only with signed challenge','T']]},['eFuse · debug lock','',4]);}
+const kcol=k=>hex(KIND[k][0]);
+function texFloorplan(){return tex(1408,1064,(g,w,h)=>{const s=w/FP.W,X=x=>(x+FP.W/2)*s,Z=z=>(z+FP.D/2)*s;
+  g.fillStyle='#0a1422';g.fillRect(0,0,w,h);
+  const r=(b,c,a=1)=>{g.globalAlpha=a;g.fillStyle=c;g.fillRect(X(b.x-b.w/2)+1,Z(b.z-b.d/2)+1,b.w*s-2,b.d*s-2);g.globalAlpha=1;};
+  FP.blocks.forEach(b=>r(b,kcol(b.kind)));
+  FP.cores.forEach(c=>{g.strokeStyle='rgba(120,200,255,.35)';g.lineWidth=1.5;g.strokeRect(X(c.x0)+1,Z(c.zN)+1,1.7*s-2,2.2*s-2);
+    CORE.sub.forEach(sb=>r(c.rect(sb.u,sb.v),sb.id==='mac'?'#18c3e6':kcol(sb.kind)));});
+  g.strokeStyle='rgba(34,230,255,.5)';g.lineWidth=4;g.strokeRect(2,2,w-4,h-4);});}
+function texStripes(c1,c2,n,m){return tex(256,256,(g,w,h)=>{g.fillStyle=c1;g.fillRect(0,0,w,h);g.fillStyle=c2;for(let i=0;i<n;i++)g.fillRect(0,i*h/n,w,h/n*.45);g.fillStyle='rgba(0,0,0,.45)';for(let i=0;i<=m;i++)g.fillRect(i*w/m-2,0,4,h);});}
+const TEX={fp:texFloorplan(),sram:texStripes('#7d1c70','#a82d96',48,4),l2:texStripes('#8f2379','#bb3aa6',40,8),hbm:texStripes('#5d1653','#8f2379',64,6)};
+
+function hbmStack(p,x,y,z,ex,n=12){const g=grp(p,x,y,z);box(g,10,.12,11,0,.06,0,M(0x2c4468,{m:.5,r:.4}),COL.mg);
+  for(let i=0;i<n;i++){const top=i===n-1,m=top?boxT(g,10,.058,11,0,.19+i*.07,0,M(0x86207a,{m:.4,r:.4,e:0x2a0626}),MT(TEX.hbm,{e:0x551a4c,ei:.6}),COL.mg):box(g,10,.058,11,0,.19+i*.07,0,M(i%2?0x77206c:0x93287f,{m:.4,r:.42,e:0x2a0626}),COL.mg);if(ex)mover(m,[0,ex*(i+1),0]);}
+  return g;}
+const HBM_TIP={t:'HBM stack',r:[['Stack','base die + 12 DRAM dies (HBM3E, 36 GB); up to 16-high, 64 GB (HBM4)','F'],['Bandwidth','HBM3E ≈ 1.2 TB/s · HBM4 ≤ 2 TB/s per stack','F'],['Target','2 stacks, ≥ 2 TB/s aggregate, 72–128 GB','T'],['Active power','≈ 15 W per stack at 1 TB/s (≈ 1.9 pJ/bit assumed)','E'],['Suppliers','SK hynix · Samsung · Micron','F']],n:'Published HBM2-era energy is nearer 3.9 pJ/bit. At full rate the two stacks could use most of the 40–60 W budget. Edge variant: LPDDR6 at ≈ 0.11–0.15 TB/s instead.'};
+const IOD=[ // I/O-die blocks, die-local mm
+ ['iou','UCIe-A PHY (I/O-die side)','phy','io',0,-2.45,8.4,.9,{r:[['Link','4 × 64 lanes to the compute die, ≈ 1 mm of interposer wire','T'],['Rate','32 GT/s per lane','T']]}],
+ ['ioc','PCIe 6.0 / CXL 3.x controller','ctl','io',-2.5,-.55,4.6,2.3,{r:[['PCIe 6.0','FLIT mode, FEC + CRC, x16','F'],['CXL','3.x runs on the PCIe 6.0 PHY at 64 GT/s','F'],['Use','host command queues; memory expansion / pooling','T']]}],
+ ['iom','Boot · management · clocks','sec','security',2.75,-.55,3.1,2.3,{r:[['Interfaces','SPI flash, I3C, JTAG, GPIO, reference clocks','T'],['Role in secure boot','loads the signed image that the root of trust verifies','T']]}],
+ ['iop','PCIe 6.0 x16 PHY','phy','io',-1.3,1.95,6,1.7,{r:[['Rate','64 GT/s per lane, PAM4','F'],['x16 raw','1,024 Gb/s ≈ 128 GB/s per direction','F'],['Why on N5/N6','SerDes gain little from 2 nm and cost far less here',null]]}],
+ ['iox','Chip-to-chip SerDes','phy','io',3.3,1.95,2.8,1.7,{r:[['Lanes','16 × 112 Gb/s PAM4 ≈ 1.8 Tb/s','T'],['Use','scale-out to multi-NPU systems','T']],n:'About 950 of these chips would be needed for a literal 1,000,000 TOPS.'}]];
+function ioDie(p,x,y,z,full){const g=grp(p,x,y,z);
+  if(full)IOD.forEach(b=>part(box(g,b[6],.07,b[7],b[4],.735,b[5],M(KIND[b[2]][0],{e:KIND[b[2]][0],ei:.25}),KIND[b[2]][1]),{name:b[1],layer:b[3],tip:b[8]}));
+  box(g,10,.7,6,0,.35,0,M(0x1a2c44,{m:.5,r:.4}),COL.gr);return g;}
+const IOD_TIP={t:'I/O die (N5 / N6)',s:'Chiplet',r:[['Size','≈ 10 × 6 mm','E'],['Contains','PCIe 6.0 x16 PHY + controller, CXL, chip-to-chip SerDes, boot and management',null],['Why separate','analog and SerDes barely shrink at 2 nm; an older node is cheaper and already proven',null]]};
+const BUILD=[];
+/* ================= L0 · accelerator card (mm) ================= */
+function texPCB(){return tex(2048,1358,(g,w,h)=>{const s=w/167.65,X=x=>(x+83.825)*s,Z=z=>(z+55.575)*s;
+  g.fillStyle='#081521';g.fillRect(0,0,w,h);
+  g.strokeStyle='rgba(60,140,180,.07)';g.lineWidth=2;for(let i=-h;i<w;i+=18){g.beginPath();g.moveTo(i,0);g.lineTo(i+h,h);g.stroke();}
+  const P=(pts,close)=>{g.beginPath();pts.forEach((p,i)=>i?g.lineTo(X(p[0]),Z(p[1])):g.moveTo(X(p[0]),Z(p[1])));if(close)g.closePath();};
+  g.lineJoin='round';
+  g.fillStyle='rgba(255,176,32,.15)';P([[-21,-23],[-30,-45],[-68,-45],[-68,27],[-30,27],[-21,11]],1);g.fill();g.strokeStyle='rgba(255,176,32,.6)';g.lineWidth=3;g.stroke();
+  g.strokeStyle='rgba(255,176,32,.55)';g.lineWidth=9;P([[-65,55],[-65,27]]);g.stroke();
+  g.lineWidth=1.7;for(let i=0;i<32;i++){const xs=-14+i*1.42,xf=-52+i*2.06;g.strokeStyle=i%2?'rgba(34,230,255,.65)':'rgba(61,255,168,.55)';P([[xs,13],[xs,17+i*.1],[xf,44],[xf,55]]);g.stroke();}
+  for(let i=0;i<16;i++){const xs=14+i*1.05,c=i<8?26:50,xf=c-7+(i%8)*2;g.strokeStyle='rgba(255,43,214,.6)';P([[xs,-25],[xs,-29-(i%8)*.4],[xf,-40],[xf,-46]]);g.stroke();}
+  g.strokeStyle='rgba(167,139,250,.55)';for(let i=0;i<6;i++){P([[37,-12+i*1.2],[44+i,-12+i*1.2],[46+i,-30],[50+i*2.2,-32]]);g.stroke();}
+  g.fillStyle='rgba(140,200,240,.35)';for(let i=0;i<900;i++){const x=rnd()*w,y=rnd()*h;g.beginPath();g.arc(x,y,1.6,0,7);g.fill();}
+  g.strokeStyle='rgba(200,225,255,.4)';g.lineWidth=2;g.strokeRect(X(-21),Z(-25),58*s,38*s);
+  g.setLineDash([10,8]);g.strokeStyle='rgba(255,43,214,.6)';for(const z of[-14,6])g.strokeRect(X(41.8),Z(z-7.5),12.4*s,15*s);g.setLineDash([]);
+  g.fillStyle='rgba(205,228,255,.6)';g.font='600 26px ui-monospace,Menlo,monospace';g.fillText('NPU-2N · concept accelerator · FHHL · PCIe 6.0 x16',X(-80),Z(-50.5));
+  g.font='18px ui-monospace,Menlo,monospace';g.fillStyle='rgba(205,228,255,.45)';g.fillText('design targets — not a product',X(-80),Z(-47));
+  g.fillText('LPDDR6 sites (edge variant)',X(40),Z(16.5));g.fillText('VCORE ≈ 0.7 V',X(-66),Z(-46.5));g.fillText('+12 V',X(-63),Z(42));g.fillText('PCIe 6.0 · 16 lanes · 64 GT/s',X(-40),Z(40));g.fillText('C2C LINKS',X(30),Z(-36));});}
+BUILD.push(function buildL0(){
+  const v=view('L0',{lvl:0,scale:.12,mpw:1e-3/.12,cam:[7.5,21,30],tgt:[.2,1,.6],explode:.55,gridY:-.7});
+  const g=v.group,yT=.785,side=M(0x0a1826,{r:.75,m:.1}),blk=M(0x14181e,{m:.3,r:.45}),sil=M(0xa7b1bf,{m:.9,r:.28});
+  part(boxT(g,167.65,1.57,111.15,0,0,0,side,MT(texPCB(),{r:.62,m:.2}),0x1d5f7a),{name:'Accelerator card',tip:{t:'Accelerator card (FHHL)',s:'Board',r:[['Form factor','PCIe full-height, half-length: 167.65 × 111.15 mm, single slot','F'],['Power','≤ 75 W from the x16 slot; no auxiliary connector at 40–60 W','F'],['PCB','≈ 12–16 layers, low-loss laminate for 64 GT/s','E'],['Edge variant','same core IP with LPDDR6 on a smaller module','T']]},lb:['FHHL card','167.65 × 111.15 mm',3,[62,0,44]]});
+  box(g,12.3,1.57,8,-65.35,0,59.57,side);
+  const fing=[];for(let i=0;i<82;i++)fing.push([-70.5+i+(i>10?2.7:0),yT+.03,60.3,.7,.06,5.6]);
+  inst(g,BOX,M(0xe6b422,{m:1,r:.22}),fing);
+  part(box(g,72.8,1.57,8,-20.9,0,59.57,side),{name:'PCIe edge connector',layer:'io',tip:{t:'PCIe 6.0 x16 edge connector',r:[['Rate','64 GT/s per lane, PAM4 with FEC','F'],['x16 raw','1,024 Gb/s ≈ 128 GB/s per direction','F'],['Also carries','CXL 3.x on the same PHY','F'],['Power pins','12 V and 3.3 V, ≤ 75 W total','F']],n:'Host bandwidth is about 16× lower than HBM bandwidth. Weights are loaded once and then stay on the card.'},lb:['PCIe 6.0 x16','64 GT/s · ≈ 128 GB/s per direction',8]});
+  part(box(g,1.2,20,121,-84.6,7.2,-4.9,sil),{name:'I/O bracket',tip:{t:'Slot bracket',s:'Mechanics',r:[['Width','single slot (≈ 18.4 mm)','F'],['Airflow','vented; chassis fans push air along the fins','T']]}});
+  // package (simplified; details at L1)
+  const pk=grp(g,8,0,-6);boxT(pk,58,1.6,38,0,2.085,0,M(0x0e2c25,{r:.7}),M(0x12382e,{r:.6}),0x1c6b55);
+  for(const s of[-1,1]){box(pk,58,1,3,0,3.385,s*17.5,sil);box(pk,3,1,32,s*27.5,3.385,0,sil);}
+  box(pk,44,.4,23.5,0,3.085,0,M(0x3a4d68,{m:.7,r:.3}),COL.cy);
+  boxT(pk,17.6,.8,13.3,0,3.685,-3.25,M(0x101c2e,{m:.6,r:.3}),MT(TEX.fp,{e:0xffffff,ei:.4}),COL.cy);
+  for(const s of[-1,1])boxT(pk,10,.95,11,s*14.8,3.76,-3.25,M(0x86207a,{m:.4,r:.4,e:0x2a0626}),MT(TEX.hbm,{e:0x551a4c,ei:.6}),COL.mg);
+  box(pk,10,.7,6,0,3.635,7.2,M(0x1a2c44,{m:.5,r:.4}),COL.gr);
+  part(pk,{name:'NPU package',layer:'compute',drill:1,tip:{t:'NPU package',s:'2.5D chiplet package',r:[['Contents','2 nm compute die · N5/N6 I/O die · 2 HBM stacks','T'],['Peak','1,049 TOPS INT8 · 2,097 TOPS INT4','T'],['TDP','40–60 W, configurable','T'],['Substrate','≈ 58 × 38 mm','E']]},lb:['NPU package','compute die + 2 HBM + I/O die',9]});
+  part(box(g,42,.3,22,8,4.24,-5.5,M(0xcdb8c4,{o:.6,r:.9})),{name:'Thermal interface material',layer:'thermal',ex:[0,30,0],tip:{t:'Thermal interface material (TIM)',r:[['Options','indium, liquid metal, graphite or polymer','F'],['Why it matters','every 0.1 °C/W here costs ≈ 5 °C at 50 W','E']]},lb:['TIM','',4]});
+  const cool=grp(g,8,4.39,-6);box(cool,70,3,50,0,1.5,0,M(0xb87333,{m:.9,r:.3}),0xffb080);
+  const fins=[];for(let i=0;i<31;i++)fins.push([0,6.75,-24+i*1.6,70,7.5,.6]);inst(cool,BOX,M(0x9aa7b8,{m:.85,r:.35}),fins).userData.nopick=false;
+  part(cool,{name:'Vapor chamber + fin stack',layer:'thermal',ex:[0,70,0],tip:{t:'Vapor chamber + fin stack',r:[['Type','single-slot, passive, chassis airflow; liquid cold plate optional','T'],['Load','40–60 W','T'],['Needed','≲ 1 °C/W junction to inlet air','E']],n:'The vapor chamber spreads the MAC-array hotspots before the fins see them.'},lb:['Vapor chamber + fins','40–60 W · or cold plate',7]});
+  // VRM
+  const vrm=grp(g);for(let i=0;i<6;i++){const z=-38+i*11.5;box(vrm,5,1,6,-38.5,yT+.5,z,blk);box(vrm,9,5,9,-48,yT+2.5,z,M(0x50565f,{m:.6,r:.5}),0x8a94a3);}
+  const cyl=new THREE.CylinderGeometry(3.2,3.2,7,20);for(let i=0;i<5;i++){const c=new THREE.Mesh(cyl,sil);c.position.set(-60,yT+3.5,-36+i*11);vrm.add(c);}
+  box(vrm,7,.9,7,-60,yT+.45,21,blk);
+  part(vrm,{name:'Multi-phase VRM',layer:'power',tip:{t:'Multi-phase VRM',r:[['Input','12 V from the slot','F'],['Output','≈ 0.7 V core at ≈ 70 A (50 W), plus HBM rails','E'],['Phases','6','E'],['Next stage','integrated regulators in the package, then the backside power network','T']]},lb:['VRM · 6 phases','12 V → ≈ 0.7 V · ≈ 70 A',7]});
+  const c2=grp(g);for(const x of[26,50]){box(c2,18,5.5,8,x,yT+2.75,-50,blk,COL.gr);box(c2,15,1,6,x,yT+5.6,-50,M(0xe6b422,{m:1,r:.3}));}
+  part(c2,{name:'Chip-to-chip link ports',layer:'io',tip:{t:'Chip-to-chip link ports',r:[['Lanes','2 ports × 8 lanes × 112 Gb/s ≈ 1.8 Tb/s','T'],['Use','ring or mesh of NPU cards for larger models','T']],n:'“Mega-TOPS” in the literal sense: about 950 of these chips.'},lb:['C2C link ports','multi-NPU scaling',6]});
+  part(box(g,5.3,1.5,5.3,50,yT+.75,-34,blk),{name:'SPI flash',layer:'security',tip:{t:'SPI flash',r:[['Holds','signed firmware image, verified by the root of trust at every boot','T']]},lb:['SPI flash','signed firmware',4]});
+  part(box(g,4,.9,4,62,yT+.45,-34,M(0x3a2a70,{m:.4,r:.4}),COL.vi),{name:'Secure element',layer:'security',tip:{t:'Secure element',r:[['Role','card identity, attestation keys, anti-rollback counters','T'],['Works with','the on-die root of trust and TEE','T']]},lb:['Secure element','identity · attestation',5]});
+  part(box(g,9,1,9,68,yT+.5,-10,blk),{name:'Board management controller',layer:'power',tip:{t:'Board management controller',r:[['Does','rail sequencing, telemetry, fan/throttle requests over SMBus/I3C','T']]},lb:['BMC','sequencing · telemetry',4]});
+  part(box(g,3.2,1,2.5,46,yT+.5,26,sil),{name:'Reference oscillator',layer:'power',tip:{t:'Reference oscillator',s:'Clock',r:[['Feeds','on-die PLLs alongside the 100 MHz PCIe reference clock','F']]}});
+  part(box(g,14,5,3,72,yT+2.5,-48,blk),{name:'Debug header',layer:'io',tip:{t:'Debug / JTAG header',r:[['Use','bring-up and lab debug; locked by fuses in production','T']]}});
+  for(const z of[-14,6])part(box(g,12.4,1,15,48,yT+.5,z,M(COL.mg,{o:.22,e:0x400a36})),{name:'LPDDR6 site',layer:'memory',tip:{t:'LPDDR6 site (edge variant)',r:[['Bandwidth','≈ 0.11–0.15 TB/s over 4 channels','E'],['Standard','JEDEC JESD209-6, July 2025','F'],['Trade-off','≈ 15× less bandwidth than HBM, far lower power and cost','E']],n:'Unpopulated on the HBM card shown here.'},lb:z<0?['LPDDR6 sites','edge variant',5]:null});
+  const caps=[];for(let i=0;i<150;i++){const a=rnd()*6.283,r=1+rnd()*.25;let x=8+Math.cos(a)*33*r,z=-6+Math.sin(a)*24*r;if(Math.abs(x)<80&&Math.abs(z)<52&&!(x<-30&&z<28))caps.push([x,yT+.25,z,1,.5,.5]);}
+  inst(g,BOX,M(0x8d7a55,{m:.4,r:.5}),caps);
+  v.A={fing:[-20,yT+.4,58],pwr:[-65,yT+.4,58],vrm:[-44,yT+5.5,-9],pkg:[8,5,-6],c2:[38,yT+6,-50]};
+});
+
+/* ================= L1 · package (mm, vertical dimensions exaggerated) ================= */
+BUILD.push(function buildL1(){
+  const v=view('L1',{lvl:1,scale:20/58,mpw:1e-3*58/20,cam:[9,14.5,22],tgt:[0,1.3,1.1],explode:.45,gridY:-4.4});
+  const g=v.group,Z0=3.25,sil=M(0xa7b1bf,{m:.9,r:.28});
+  const sph=new THREE.SphereGeometry(1,8,6),arr=(nx,nz,p,x0,y,z0,r)=>{const a=[];for(let i=0;i<nx;i++)for(let j=0;j<nz;j++)a.push([x0+(i-(nx-1)/2)*p,y,z0+(j-(nz-1)/2)*p,r,r,r]);return a;};
+  part(inst(g,sph,M(0xcfd4dc,{m:.9,r:.25}),arr(44,28,1.27,0,-.34,Z0,.34)),{name:'BGA balls',inst:true,ex:[0,-9,0],tip:{t:'BGA balls',s:'Package',r:[['Count','≈ 1,200–2,000','E'],['Pitch','≈ 1.0–1.27 mm','E'],['Carry','core power, PCIe lanes, chip-to-chip links, sideband',null]]},lb:['BGA balls','≈ 1.27 mm pitch',2,[20,0,12]]});
+  const sub=mover(grp(g),[0,-5,0]);
+  const ivr=grp(sub);for(let i=0;i<8;i++)box(ivr,2.6,.9,2.2,-15.4+i*4.4,2.05,Z0-13.6,M(0x94690f,{m:.5,r:.4,e:0x3a2800}),COL.am);
+  part(ivr,{name:'Package voltage-regulator stage',layer:'power',tip:{t:'Integrated voltage regulator stage',r:[['Parts','power inductors and deep-trench capacitors in the package','T'],['Why here','short path to the backside power bumps under the die',null],['Load','≈ 50–70 A at ≈ 0.7 V','E']]},lb:['IVR inductors','in-package stage',4]});
+  const st=grp(sub);for(const s of[-1,1]){box(st,58,1,2.4,0,2.1,Z0+s*17.8,sil);box(st,2.4,1,33.2,s*27.8,2.1,Z0,sil);}
+  part(st,{name:'Stiffener ring',tip:{t:'Stiffener ring',s:'Mechanics',r:[['Purpose','controls warpage of a large, thin 2.5D assembly',null]]}});
+  part(boxT(sub,58,1.6,38,0,.8,Z0,M(0x0e2c25,{r:.7}),MT(tex(1024,672,(c,w,h)=>{c.fillStyle='#0f3329';c.fillRect(0,0,w,h);c.strokeStyle='rgba(120,255,200,.16)';c.lineWidth=1.5;for(let i=0;i<120;i++){const a=i/120*6.283;c.beginPath();c.moveTo(w/2+Math.cos(a)*w*.3,h/2+Math.sin(a)*h*.26);c.lineTo(w/2+Math.cos(a)*w*.7,h/2+Math.sin(a)*h*.7);c.stroke();}}),{r:.6}),0x1c6b55),{name:'Organic substrate',tip:{t:'Organic build-up substrate (ABF)',s:'Package',r:[['Size','≈ 58 × 38 mm','E'],['Layers','≈ 16–20 build-up layers','E'],['Does','fans micro-scale bumps out to the 1.27 mm ball grid, carries ≈ 70 A',null]]},lb:['ABF substrate','≈ 58 × 38 mm',4,[-24,0,15]]});
+  part(inst(g,sph,M(0xb9c0cb,{m:.9,r:.3}),arr(39,21,1.1,0,1.73,Z0,.13)),{name:'C4 bumps',inst:true,ex:[0,-2.5,0],tip:{t:'C4 bumps',s:'Package',r:[['Pitch','≈ 130–150 µm (drawn much sparser)','E'],['Join','interposer through-silicon vias to the substrate',null]]}});
+  part(boxT(g,44,.4,23.5,0,2.06,Z0,M(0x33465f,{m:.75,r:.28}),MT(tex(1408,752,(c,w,h)=>{const s=w/44,X=x=>(x+22)*s,Z=z=>(z-Z0+11.75)*s;c.fillStyle='#31445d';c.fillRect(0,0,w,h);c.fillStyle='rgba(180,215,255,.28)';for(let x=-21.5;x<22;x+=.55)for(let z=-8;z<14.6;z+=.55)c.fillRect(X(x),Z(z),2,2);
+    c.lineWidth=1.2;for(const sg of[-1,1])for(let i=0;i<60;i++){c.strokeStyle='rgba(255,43,214,.8)';const z=-4.4+i*.149;c.beginPath();c.moveTo(X(sg*12.5),Z(z));c.lineTo(X(sg*7.6),Z(z));c.stroke();}
+    for(let i=0;i<64;i++){c.strokeStyle='rgba(61,255,168,.8)';const x=-4.3+i*.1365;c.beginPath();c.moveTo(X(x),Z(5.6));c.lineTo(X(x),Z(8.6));c.stroke();}}),{m:.6,r:.35}),COL.cy),{name:'Silicon interposer',tip:{t:'Silicon interposer (2.5D)',s:'Package',r:[['Size','≈ 44 × 23.5 mm ≈ 1,034 mm²','E'],['Litho field','26 × 33 mm = 858 mm², so this needs stitching','F'],['Wiring','sub-µm lines for HBM buses and UCIe lanes',null],['Vias','through-silicon vias down to C4 bumps',null]]},lb:['Silicon interposer','2.5D · ≈ 44 × 23.5 mm',5,[-17,0,10]]});
+  for(const s of[-1,1])part(box(g,1.1,.05,9,s*9.3,2.3,0,GL(COL.mg,.75)),{name:'HBM bus',layer:'memory',tip:{t:'HBM bus in the interposer',r:[['Wires','1,024 data lines (HBM3E) or 2,048 (HBM4) per stack, ≈ 1 mm long','F'],['Rate','≈ 1.2 TB/s (HBM3E) to ≤ 2 TB/s (HBM4) per stack','F']]}});
+  part(box(g,9,.05,.9,0,2.3,7.05,GL(COL.gr,.75)),{name:'UCIe link',layer:'io',tip:{t:'UCIe link in the interposer',r:[['Lanes','4 modules × 64','T'],['Rate','≈ 1 TB/s per direction, raw','T'],['Standard','UCIe-A, 25–55 µm bump pitch','F']]},lb:['UCIe link','≈ 1 TB/s per direction',6,[0,.4,0]]});
+  part(inst(g,sph,M(0xd9c58a,{m:.9,r:.3}),arr(22,16,.8,0,2.33,0,.07).concat(arr(12,13,.8,-14.8,2.33,0,.07),arr(12,13,.8,14.8,2.33,0,.07),arr(12,7,.8,0,2.33,10.45,.07))),{name:'Micro-bumps',inst:true,ex:[0,2,0],tip:{t:'Micro-bumps',s:'Package',r:[['Pitch','≈ 40–55 µm (drawn much sparser)','E'],['Join','each die to the interposer',null]]}});
+  part(box(g,17.2,.07,12.9,0,2.36,0,M(COL.am,{m:.7,r:.35,e:0x6a4300})),{name:'Backside power network',layer:'power',ex:[0,3.6,0],cond:w=>w.explode>.06,tip:{t:'Backside power network (BSPDN)',r:[['What','power rails built on the back of the wafer, under the transistors','F'],['Benefit','lower IR drop; front-side metal is left for signals',null],['Found on','Intel 18A, TSMC A16, Samsung SF2Z — not base N2','F']]},lb:['Backside power network','power enters from below',6,[5,0,4]]});
+  const dg=mover(grp(g,0,2.38,0),[0,5,0]);v.dieG=dg;
+  for(const s of[-1,1])part(hbmStack(dg,s*14.8,0,0,.42),{name:'HBM stack',layer:'memory',tip:HBM_TIP,lb:['HBM stack','12-high · ≥ 1 TB/s',7]});
+  part(ioDie(dg,0,0,10.45,true),{name:'I/O die',layer:'io',tip:IOD_TIP,lb:['I/O die · N5/N6','PCIe 6.0 x16 · CXL · C2C',7]});
+  part(boxT(dg,17.6,.8,13.3,0,.4,0,M(0x101c2e,{m:.6,r:.3}),MT(TEX.fp,{e:0xffffff,ei:.45}),COL.cy),{name:'Compute die',layer:'compute',drill:2,tip:{t:'2 nm compute die',r:[['Size','17.6 × 13.3 mm ≈ 234 mm²','E'],['Transistors','≈ 30 billion','E'],['Contents','32 NPU cores, 128 MB L2, HBM PHYs, UCIe, security','T'],['Power','≈ 20–40 W of the 40–60 W budget','E']]},lb:['2 nm compute die','17.6 × 13.3 mm · 32 cores',9]});
+  part(box(g,13.6,.3,6,0,3.33,0,M(0xb02c98,{o:.5,e:0x4a1040,m:.4,r:.4}),COL.mg),{name:'3D-stacked SRAM',layer:'memory',ex:[0,7.6,0],tip:{t:'3D-stacked SRAM die (optional)',r:[['Bonding','copper-to-copper hybrid bonding, ≤ 9 µm pitch','F'],['Capacity','≈ 256 MB on an N5/N4-class die','E'],['Use','L2 extension and KV-cache hot tier, ≈ 2 TB/s','E']],n:'It also sits in the heat path above the cores. That is the trade-off.'},lb:['3D-stacked SRAM (optional)','hybrid bonding ≤ 9 µm',6]});
+  part(box(g,40.5,.16,21,0,3.62,3.4,M(0xcdb8c4,{o:.34,r:.9})),{name:'Thermal interface material',layer:'thermal',ex:[0,10.5,0],tip:{t:'Thermal interface material (TIM)',r:[['Options','indium, liquid metal, graphite or polymer','F'],['Bare-die','no lid: the cold plate presses on the dies directly','T'],['Hotspots','≈ 0.65–0.75 W/mm² over the MAC arrays','E']]},lb:['TIM','',4,[-15,0,8]]});
+  part(box(g,50,1.6,30,0,4.6,Z0,M(0xc47a3a,{m:.85,r:.3,o:.4}),0xffb080),{name:'Vapor chamber / cold plate',layer:'thermal',ex:[0,14,0],tip:{t:'Vapor chamber / cold plate',r:[['Does','spreads hotspots sideways, then hands heat to fins or liquid','T'],['Limits','≈ 105 °C logic, ≈ 95 °C DRAM (typical)','E'],['Budget','≲ 1 °C/W junction to inlet','E']],n:'HBM is the temperature-sensitive part: it sits next to a hot die and tolerates less.'},lb:['Vapor chamber / cold plate','spreads the hotspots',6]});
+});
+
+/* ================= runtime: labels, hover, camera, navigation ================= */
+const lroot=$('#labels'),tipEl=$('#tip'),veil=$('#veil'),diveEl=$('#dive');
+let actLabels=[],sorted=[],curPicks=[],frameNo=0,busy=false,hov=null,dragging=false,pmoved=false,inside=false,mx=0,my=0,fly=null,cooldown=0;
+const ptr=new THREE.Vector2(),ray=new THREE.Raycaster(),_v=new THREE.Vector3(),_b=new THREE.Box3();
+const hbox=new THREE.LineSegments(EDGE,new THREE.LineBasicMaterial({color:0xffffff,depthTest:false,transparent:true}));hbox.renderOrder=99;hbox.visible=false;scene.add(hbox);
+hbox.add(new THREE.Mesh(BOX,new THREE.MeshBasicMaterial({color:COL.cy,transparent:true,opacity:.13,depthWrite:false})));
+const FX={refresh(){},tick(){}};
+function mkLabel(l){const e=document.createElement('div');e.className='lb '+l.cls;const c=l.col??(l.layer&&LAYERS[l.layer][1]);if(c)e.style.setProperty('--c',hex(c));e.innerHTML=`<b>${l.text}</b>${l.sub?`<span>${l.sub}</span>`:''}`;e.style.display='none';lroot.appendChild(e);l.el=e;l.w=l.text.length*6.6+14;l.h=l.sub?32:19;l.ctr=/\bsm\b/.test(l.cls);}
+function updateLabels(){const w=stage.clientWidth,h=stage.clientHeight;
+  for(const l of actLabels){let vis=state.labels&&shown(l.obj)&&(!l.when||l.when());
+    if(vis){l.obj.getWorldPosition(_v).add(l.off).project(camera);vis=_v.z<1&&Math.abs(_v.x)<1.02&&Math.abs(_v.y)<1.02;l.x=(_v.x*.5+.5)*w;l.y=(-_v.y*.5+.5)*h;}
+    l.vis=vis;}
+  if(frameNo%5===0){const acc=[];for(const l of sorted){if(!l.vis){l.hid=false;continue;}if(l.on&&!l.m){l.w=l.el.offsetWidth;l.h=l.el.offsetHeight;l.m=1;}
+    const x0=l.x-l.w/2,x1=x0+l.w,y1=l.ctr?l.y+l.h/2:l.y-10,y0=y1-l.h;let hit=false;for(const a of acc)if(x0<a[2]&&x1>a[0]&&y0<a[3]&&y1>a[1]){hit=true;break;}
+    l.hid=hit;if(!hit)acc.push([x0,y0,x1,y1]);}}
+  for(const l of actLabels){const on=l.vis&&!l.hid;if(on!==l.on){l.el.style.display=on?'block':'none';l.on=on;}
+    if(on)l.el.style.transform=`translate(calc(${l.x.toFixed(1)}px - 50%),calc(${l.y.toFixed(1)}px - ${l.ctr?'50%':'100% - 12px'}))`;}}
+function setHover(p,h){if(p===hov)return;hov=p;canvas.style.cursor=p&&(p.drill!==undefined||p.click)?'pointer':'grab';cur&&cur.onHover&&cur.onHover(p);
+  if(!p){tipEl.style.display='none';hbox.visible=false;return;}
+  tipEl.innerHTML=tipHTML(p);tipEl.style.display='block';}
+function updateHover(){
+  if(pmoved&&inside&&!dragging&&!busy){pmoved=false;ray.setFromCamera(ptr,camera);let p=null,hit=null;for(const h of ray.intersectObjects(curPicks,false))if(shown(h.object)){p=h.object.userData.pr;hit=h;break;}setHover(p,hit);}
+  if(!hov)return;
+  if(hov.nobox)hbox.visible=false;else{_b.setFromObject(hov.obj);_b.getCenter(hbox.position);_b.getSize(hbox.scale).addScalar(.05);hbox.visible=true;}
+  const tw=tipEl.offsetWidth,th=tipEl.offsetHeight;let x=mx+18,y=my+18;if(x+tw>innerWidth-8)x=mx-tw-14;if(y+th>innerHeight-8)y=Math.max(8,my-th-14);tipEl.style.transform=`translate(${x}px,${y}px)`;}
+canvas.addEventListener('pointermove',e=>{const r=canvas.getBoundingClientRect();ptr.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);mx=e.clientX;my=e.clientY;pmoved=inside=true;});
+canvas.addEventListener('pointerleave',()=>{inside=false;setHover(null);});
+let down=null;
+canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,t:performance.now()};dragging=true;});
+addEventListener('pointerup',e=>{dragging=false;if(!down)return;const d=Math.hypot(e.clientX-down.x,e.clientY-down.y),dt=performance.now()-down.t;down=null;if(d<6&&dt<600&&!busy)onClick(e);});
+function onClick(e){const r=canvas.getBoundingClientRect();ptr.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ptr,camera);let p=null;
+  for(const h of ray.intersectObjects(curPicks,false))if(shown(h.object)){p=h.object.userData.pr;break;}
+  if(!p){select(null);return;}
+  if(p.click){p.click(p);return;}
+  if(p.drill!==undefined&&cur.lvl!==undefined){if(p.core!==undefined)state.core=p.core;goLevel(p.drill,{focus:p});return;}
+  select(p);focusPart(p);}
+function select(p){state.sel=p;renderRight();}
+function focusPart(p){const c=centerOf(p),d=camera.position.clone().sub(controls.target).normalize();busy=true;controls.enabled=false;
+  flyTo(c.clone().addScaledVector(d,Math.min(cur.maxD,Math.max(p.rad*3.4,cur.minD*1.05))),c,650,()=>{busy=false;controls.enabled=true;});}
+const ease=k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+function flyTo(pos,tgt,dur,done){fly={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos,t1:tgt,s:performance.now(),dur,done};}
+function stepFly(now){const k=Math.min(1,(now-fly.s)/fly.dur),e=ease(k);camera.position.lerpVectors(fly.p0,fly.p1,e);controls.target.lerpVectors(fly.t0,fly.t1,e);camera.lookAt(controls.target);if(k>=1){const d=fly.done;fly=null;d&&d();}}
+function applyLayers(){for(const w of[cur].concat((cur.also||[]).map(k=>VIEWS[k])))for(const e of w.layered)e.obj.visible=state.layers[e.layer]!==false&&(!e.cond||e.cond(w));}
+function applyExplode(){for(const w of[cur].concat((cur.also||[]).map(k=>VIEWS[k])))for(const o of w.movers)o.position.copy(o.userData.base).addScaledVector(o.userData.ex,w.explode);applyLayers();}
+function activate(v){
+  if(cur){cur.group.visible=false;(cur.also||[]).forEach(k=>VIEWS[k].group.visible=false);for(const l of actLabels){l.el.style.display='none';l.on=false;}cur.onHide&&cur.onHide();}
+  cur=v;v.group.visible=true;(v.also||[]).forEach(k=>VIEWS[k].group.visible=true);
+  curPicks=v.picks.concat(...(v.also||[]).map(k=>VIEWS[k].picks));
+  actLabels=v.labels;actLabels.forEach(l=>{if(!l.el)mkLabel(l);});sorted=[...actLabels].sort((a,b)=>b.pri-a.pri);
+  controls.minDistance=v.minD;controls.maxDistance=v.maxD;grid.position.y=v.gridY??0;grid.visible=v.grid!==false;
+  state.sel=null;$('#explode').value=v.explode;applyExplode();v.onShow&&v.onShow();FX.refresh();syncUI();}
+function go(to,{dir=0,focus=null,from=null}={}){
+  if(busy)return;busy=true;controls.enabled=false;setHover(null);press=0;diveEl.classList.remove('on');
+  const done=()=>{busy=false;controls.enabled=true;cooldown=performance.now()+450;};
+  const swap=()=>{activate(to);let p0,t0;
+    if(dir<0&&from){const cp=to.parts.find(p=>p.drill===from.lvl&&(p.core===undefined||p.core===state.core));
+      if(cp){t0=centerOf(cp);p0=t0.clone().addScaledVector(to.dir,Math.max(cp.rad*2.2,to.minD*.6));}}
+    if(!p0){t0=new THREE.Vector3(...to.tgt);p0=t0.clone().addScaledVector(to.dir,to.dist*(dir>0?2.6:dir<0?.5:1.45));}
+    camera.position.copy(p0);controls.target.copy(t0);camera.lookAt(t0);veil.classList.remove('on');
+    flyTo(new THREE.Vector3(...to.cam),new THREE.Vector3(...to.tgt),dir?950:750,done);};
+  if(!cur){swap();return;}
+  veil.classList.add('on');const d=camera.position.clone().sub(controls.target);
+  if(dir>0){const c=focus?centerOf(focus):controls.target.clone(),r=focus?focus.rad:d.length()*.2;flyTo(c.clone().addScaledVector(d.normalize(),Math.max(r*1.5,1.2)),c,560,swap);}
+  else if(dir<0)flyTo(controls.target.clone().addScaledVector(d,2.1),controls.target.clone(),480,swap);
+  else setTimeout(swap,340);}
+function goLevel(i,o={}){if(busy||i<0||i>5)return;const to=VIEWS['L'+i];if(!to||to===cur)return;const from=cur&&cur.lvl!==undefined?cur:null;state.level=i;go(to,{dir:from?Math.sign(i-from.lvl):0,focus:o.focus,from});}
+function setMode(m){if(busy||m===state.mode)return;state.mode=m;document.body.className='m-'+m;$$('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  let to;if(m==='arch'||m==='flow'){if(m==='flow'&&![1,2,3].includes(state.level))state.level=2;to=VIEWS['L'+state.level];}else to=VIEWS[m];
+  if(!to)return;if(to===cur){FX.refresh();syncUI();}else go(to);}
+function diveTarget(){const n=cur.lvl+1;if(hov&&hov.drill===n)return hov;let best=null,bd=1e9;for(const p of cur.parts)if(p.drill===n&&shown(p.obj)){const d=centerOf(p).distanceTo(controls.target);if(d<bd){bd=d;best=p;}}return best;}
+let press=0,pressDir=0,pressT=0;
+canvas.addEventListener('wheel',e=>{if(busy||!cur||cur.lvl===undefined||performance.now()<cooldown)return;
+  const d=camera.position.distanceTo(controls.target),dn=e.deltaY<0?1:-1,lim=dn>0?d<=cur.minD*1.05:d>=cur.maxD*.95,can=dn>0?cur.lvl<5&&VIEWS['L'+(cur.lvl+1)]:cur.lvl>0;
+  if(!lim||!can){press=0;diveEl.classList.remove('on');return;}
+  if(dn!==pressDir)press=0;pressDir=dn;press+=Math.min(Math.abs(e.deltaY),120);pressT=performance.now();
+  diveEl.innerHTML=(dn>0?`Keep scrolling to dive into L${cur.lvl+1}`:`Keep scrolling to rise to L${cur.lvl-1}`)+`<i><u style="width:${Math.min(100,press/3.6)}%"></u></i>`;diveEl.classList.add('on');
+  if(press>=360){if(dn>0){const t=diveTarget();if(t&&t.core!==undefined)state.core=t.core;goLevel(cur.lvl+1,{focus:t});}else goLevel(cur.lvl-1);}
+},{passive:true});
+addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+  if(e.key==='Escape'&&cur&&cur.lvl>0)goLevel(cur.lvl-1);else if(e.key==='l'||e.key==='L')$('#btnLabels').click();else if(e.key==='r'||e.key==='R')$('#btnReset').click();
+  else if(/^[0-5]$/.test(e.key)&&(state.mode==='arch'||state.mode==='flow'))goLevel(+e.key);});
+
+/* ================= UI ================= */
+const LV=[['Accelerator card','≈ 168 mm'],['Package','≈ 58 mm'],['Die floorplan','17.6 mm'],['NPU core','2.2 mm'],['MAC element','≈ 8 µm'],['Transistor','≈ 48 nm pitch']];
+const INFO=[
+ {t:'Accelerator card',b:'A single-slot PCIe card. The package sits under a vapor chamber, and the slot supplies both the data link and all of the power.',r:[['Host link','PCIe 6.0 x16 · ≈ 128 GB/s per direction','F'],['Power','40–60 W TDP from a 75 W slot','T'],['Core rail','≈ 0.7 V at ≈ 70 A','E'],['Scale-out','2 chip-to-chip link ports','T'],['Edge variant','LPDDR6 instead of HBM','T']]},
+ {t:'Package',b:'A 2.5D chiplet package: the 2 nm compute die, an N5/N6 I/O die and two HBM stacks share a silicon interposer. Use the exploded-view slider to pull the stack apart. Vertical dimensions are exaggerated.',r:[['Compute die','17.6 × 13.3 mm ≈ 234 mm²','E'],['HBM','2 stacks · ≥ 2 TB/s · 72–128 GB','T'],['Die-to-die','UCIe-A ≈ 1 TB/s per direction','T'],['Interposer','≈ 44 × 23.5 mm, larger than one litho field','E'],['Option','3D-stacked SRAM by hybrid bonding','T']]},
+ {t:'Die floorplan',b:'32 NPU cores in a 4 × 8 grid around a shared L2 SRAM spine. HBM PHYs take the west and east edges, the UCIe link the south. Hot MAC arrays alternate with cooler SRAM. Explode to see the metal stack above and the power network below.',r:[['Peak',`${f0(K.tops8)} TOPS INT8 · ${f0(K.tops4)} TOPS INT4`,'T'],['Die','≈ 234 mm² · ≈ 30 B transistors','E'],['On-die SRAM','384 MB ≈ 81 mm², a third of the die','E'],['NoC','8 × 4 mesh · 64 GB/s links · 256 GB/s row trunks','T']]},
+ {t:'NPU core',b:'One of 32 identical tiles. Weights and activations leave the scratchpad, march through the systolic array one element per clock, and are finished by the vector and transformer units.',r:[['Peak',`${f1(K.topsCore)} TOPS INT8`,'T'],['Tile','1.7 × 2.2 mm = 3.74 mm²','E'],['Scratchpad','8 MB · 256 GB/s','T'],['Array','256 GB/s at the edges · ≈ 32.8 TB/s inside','T']]},
+ {t:'MAC processing element',b:'One of 16,384 per core. Every clock tick it multiplies an activation by a weight, adds the product to a running sum, and hands both operands on to its neighbours.',r:[['Footprint','≈ 8 × 8 µm','E'],['Transistors','≈ 8,000','E'],['Cycle','1 ns → 1 MAC = 2 ops','T'],['Energy','≈ 40 fJ datapath · ≈ 95 fJ all-in budget','E']]},
+ {t:'Transistor and metal stack',b:'Gate-all-around nanosheet transistors, with power arriving from the back of the wafer and signals routed through 16 metal layers above. Schematic: the upper metal layers are drawn compressed.',r:[['Channel','3 nanosheets, ≈ 5–6 nm thick','E'],['Gate pitch','≈ 48 nm','E'],['Tightest metal','≈ 20–24 nm pitch, EUV','E'],['EUV','13.5 nm light, 0.33 NA','F'],['Backside power','18A / A16 / SF2Z-style, not base N2','F']]}];
+const kvH=r=>`<dl class="kv">${r.map(x=>`<dt>${x[0]}</dt><dd>${x[1]}${tagH(x[2])}</dd>`).join('')}</dl>`;
+function areaBar(items,total,unit){const cols=['#18c3e6','#c034a8','#3d7be0','#22b573','#e0a020','#7a63d6','#5c6f8a','#2a3648'];const used=items.reduce((a,i)=>a+i[1],0);items=items.concat([['margins / whitespace',Math.max(0,total-used)]]);
+  return `<div class="stack">${items.map((it,i)=>`<i style="width:${it[1]/total*100}%;background:${cols[i%cols.length]}" title="${it[0]}"></i>`).join('')}</div><div class="lg">${items.map((it,i)=>`<span><i class="sw" style="--c:${cols[i%cols.length]}"></i>${it[0]} ${(it[1]/total*100).toFixed(0)}%</span>`).join('')}</div><div class="hint" style="margin-top:4px">of ${f2(total)} ${unit} <i class="tg E">estimate</i></div>`;}
+const RP={};
+RP.arch=()=>{const i=cur.lvl,I=INFO[i];let h=`<h3>L${i} · ${I.t}${i===3?' C'+String(state.core).padStart(2,'0'):''}</h3><p>${I.b}</p><div class="card">${kvH(I.r)}</div>`;
+  if(i===2){const A=k=>FP.blocks.filter(b=>k.includes(b.kind)).reduce((a,b)=>a+b.w*b.d,0);h+=`<div class="card"><h5>Die area budget</h5>${areaBar([['32 NPU cores',32*K.tileA],['L2 SRAM',A(['l2'])],['logic',A(['logic','dft'])],['PHYs + controllers',A(['phy','ctl'])],['power / clock',A(['pwr','misc'])],['security',A(['sec'])]],K.dieA,'mm²')}</div>`;}
+  if(i===3)h+=`<div class="card"><h5>Core area budget</h5>${areaBar([['MAC array',CORE.by.mac.a],['scratchpad SRAM',CORE.by.sp.a],['vector + transformer + quant + sparsity',CORE.by.vu.a+CORE.by.tfu.a+CORE.by.qdq.a+CORE.by.spd.a+CORE.by.rv.a],['DMA + router',CORE.by.dma.a+CORE.by.rt.a],['power / clock',CORE.by.pg.a]],K.tileA,'mm²')}</div>`;
+  h+=state.sel?`<div class="card" style="border-color:rgba(34,230,255,.5)">${tipHTML(state.sel,true)}</div>`:`<p class="hint">Hover any block for its numbers. Click to focus and pin it here.</p>`;
+  return h+`<div class="lg" style="margin-top:8px"><span>${tagH('T')} design goal</span><span>${tagH('E')} my estimate</span><span>${tagH('F')} published</span></div>`;};
+function renderRight(){const f=RP[state.mode];if(f&&cur)$('#rp').innerHTML=f();RP.after&&RP.after();}
+function syncUI(){$$('#rail button').forEach((b,i)=>{b.classList.toggle('on',cur.lvl===i);b.disabled=!VIEWS['L'+i];});
+  const T={team:'Team · who builds it',timeline:'Timeline · how it is built',ladder:'Reality-check ladder'};
+  $('#crumbT').innerHTML=cur.lvl!==undefined?`<b>L${cur.lvl}</b> · ${INFO[cur.lvl].t}${state.mode==='flow'?' · data-flow':''}`:`<b>${T[cur.key]||''}</b>`;
+  $('#scale').style.display=cur.mpw?'flex':'none';renderRight();}
+function updateScale(){if(!cur||!cur.mpw)return;const d=camera.position.distanceTo(controls.target),ppw=stage.clientHeight/(2*d*Math.tan(camera.fov*Math.PI/360)),m=110/ppw*cur.mpw;
+  const e=Math.pow(10,Math.floor(Math.log10(m))),n=[5,2,1].find(k=>k*e<=m)*e;const s=n>=1e-3?+(n*1e3).toPrecision(2)+' mm':n>=1e-6?+(n*1e6).toPrecision(2)+' µm':+(n*1e9).toPrecision(2)+' nm';
+  $('#scale i').style.width=(n/cur.mpw*ppw).toFixed(0)+'px';$('#scale span').textContent=s+(cur.lvl===5?' (schematic)':'');}
+function initUI(){
+  $('#rail').innerHTML=LV.map((l,i)=>`<button data-l="${i}"><i>L${i}</i><span>${l[0]}<small>${l[1]}</small></span></button>`).join('');
+  $$('#rail button').forEach(b=>b.onclick=()=>goLevel(+b.dataset.l));
+  $('#layers').innerHTML=Object.entries(LAYERS).map(([k,l])=>`<label style="--c:${hex(l[1])}"><input type="checkbox" data-k="${k}" checked><i></i>${l[0]}</label>`).join('');
+  $$('#layers input').forEach(c=>c.onchange=()=>{state.layers[c.dataset.k]=c.checked;applyLayers();FX.refresh();});
+  $('#explode').oninput=e=>{cur.explode=+e.target.value;applyExplode();};
+  $$('#overlay button').forEach(b=>b.onclick=()=>{state.overlay=b.dataset.ov;$$('#overlay button').forEach(x=>x.classList.toggle('on',x===b));FX.refresh();});
+  $$('#modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+  $('#btnLabels').onclick=e=>{state.labels=!state.labels;e.currentTarget.classList.toggle('on',state.labels);};
+  $('#btnReset').onclick=()=>{if(busy)return;busy=true;controls.enabled=false;flyTo(new THREE.Vector3(...cur.cam),new THREE.Vector3(...cur.tgt),700,()=>{busy=false;controls.enabled=true;});};
+  $('#gripL').onclick=e=>{const s=$('#left').classList.toggle('shut');e.currentTarget.textContent=s?'›':'‹';};
+  $('#gripR').onclick=e=>{const s=$('#right').classList.toggle('shut');e.currentTarget.classList.toggle('shut',s);e.currentTarget.textContent=s?'‹':'›';};
+  if(innerWidth<900){$('#gripL').click();if(innerWidth<700)$('#gripR').click();}}
+let fT=performance.now(),fN=0,slow=0;
+function tickFps(now){fN++;if(now-fT<500)return;const fps=fN*1000/(now-fT),i=renderer.info.render;fT=now;fN=0;
+  $('#fps').textContent=`${fps.toFixed(0)} fps · ${i.calls} draws · ${(i.triangles/1e3).toFixed(0)}k tris`;
+  if(fps<40&&pxr>1){if(++slow>=4){pxr=Math.max(1,pxr-.25);renderer.setPixelRatio(pxr);resize();slow=0;}}else slow=0;}
+/* ================= shared animated MAC-array surface ================= */
+const MACU={uT:{value:0},uAct:{value:.7}};
+function macMat(n){return new THREE.ShaderMaterial({uniforms:{uT:MACU.uT,uAct:MACU.uAct,uN:{value:n}},
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:`varying vec2 vUv;uniform float uT,uAct,uN;
+float h1(float n){return fract(sin(n*91.345)*47453.5453);}
+void main(){vec2 g=vUv*uN,f=fract(g);float px=max(fwidth(g.x),fwidth(g.y));
+ float e=.1+px,cell=smoothstep(0.,e,f.x)*smoothstep(0.,e,f.y)*smoothstep(0.,e,1.-f.x)*smoothstep(0.,e,1.-f.y);
+ cell=mix(cell,.7,clamp(px*1.5,0.,1.));
+ float ph=(vUv.x+1.-vUv.y)*.5,s=ph*5.-uT*.6,w=fract(s),band=floor(s);   // wavefront runs NW -> SE, one PE per clock
+ float lit=step(h1(band),sqrt(uAct))*(.3+.7*uAct);
+ float wave=smoothstep(0.,.05,w)*(1.-smoothstep(.05,.6,w))*lit;
+ vec3 col=vec3(.012,.085,.12)+mix(vec3(.05,.75,1.),vec3(1.,.1,.8),ph)*wave;
+ gl_FragColor=vec4(col*(.35+.65*cell),1.);
+ #include <colorspace_fragment>
+}`});}
+function texWires(c1,c2,n){return tex(512,512,(g,w,h)=>{g.clearRect(0,0,w,h);for(let i=0;i<n;i++){g.strokeStyle=i%3?c1:c2;g.lineWidth=1+rnd()*2;const x=rnd()*w,y=rnd()*h,l=30+rnd()*160;g.beginPath();g.moveTo(x,y);i%2?g.lineTo(x+l,y):g.lineTo(x,y+l);g.stroke();}});}
+
+/* ================= L2 · die floorplan (mm) ================= */
+BUILD.push(function buildL2(){
+  const v=view('L2',{lvl:2,scale:20/FP.W,mpw:1e-3*FP.W/20,cam:[0,31,21],tgt:[0,0,1.4],gridY:-9});
+  const g=v.group;
+  part(mover(box(g,44,.3,23.5,0,-.6,3.25,M(0x1c2a3f,{m:.6,r:.4}),0x2a4a6a),[0,-6.5,0]),{name:'Silicon interposer',tip:{t:'Silicon interposer',s:'Package context',r:[['Carries','HBM buses, UCIe lanes, power and ground through-silicon vias',null],['Size','≈ 44 × 23.5 mm','E']]}});
+  for(const s of[-1,1])part(hbmStack(g,s*14.8,-.45,0,0,6),{name:'HBM stack',layer:'memory',tip:HBM_TIP,lb:['HBM stack','≥ 1 TB/s · 36–64 GB',6]});
+  part(ioDie(g,0,-.45,10.45,false),{name:'I/O die',layer:'io',tip:IOD_TIP,lb:['I/O die · N5/N6','PCIe 6.0 x16 · CXL · C2C',5]});
+  const fl=grp(g);v.floor=fl;
+  part(box(fl,FP.W,.3,FP.D,0,-.15,0,M(0x0b1524,{m:.5,r:.5}),COL.cy),{name:'Compute die',tip:{t:'2 nm compute die',s:'Die',r:[['Size','17.6 × 13.3 mm ≈ 234 mm²','E'],['Transistors','≈ 30 billion','E'],['Peak',`${f0(K.tops8)} TOPS INT8`,'T']]}});
+  const mm=macMat(128),spT=MT(TEX.sram,{e:0x6a1a5e,ei:.55}),spS=M(KIND.sram[0],{e:0x2a0626}),base=M(0x101d30,{m:.4,r:.5}),mS=M(KIND.mac[0],{e:0x04303c}),lg=M(KIND.logic[0],{e:KIND.logic[0],ei:.25}),ct=M(0x1a5c78,{e:0x0a2c3a}),rt=M(KIND.ctl[0],{e:KIND.ctl[0],ei:.3});
+  for(const c of FP.cores){const cg=grp(fl),R=(u,vv,h,mat,top)=>{const r=c.rect(u,vv);return top?boxT(cg,r.w,h,r.d,r.x,.03+h/2,r.z,mat,top):box(cg,r.w,h,r.d,r.x,.03+h/2,r.z,mat);};
+    box(cg,1.66,.03,2.16,c.cx,.015,c.cz,base,0x2c5f8a);
+    R(CORE.by.sp.u,CORE.by.sp.v,.14,spS,spT);R(CORE.by.mac.u,CORE.by.mac.v,.26,mS,mm);R([1.12,1.65],[.58,1.07],.2,lg);R([1.12,1.65],[.2,.56],.16,ct);R([1.12,1.65],[.05,.18],.12,rt);
+    const id=String(c.id).padStart(2,'0');
+    part(cg,{name:'NPU core C'+id,layer:'compute',drill:3,core:c.id,tip:{t:'NPU core C'+id,s:`Compute · row ${c.r}, column ${c.k}`,r:[['Peak',`16,384 MACs × 2 × 1 GHz = ${f1(K.topsCore)} TOPS INT8`,'T'],['Tile','1.7 × 2.2 mm = 3.74 mm²','E'],['Scratchpad','8 MB SRAM','T'],['Power','≈ 0.9 W at full load (model)','E'],['Island','own voltage and frequency; can be gated off','T']]},lb:c.id===2?['32 NPU cores','click any core',9]:['C'+id,'',1,null,'sm']});}
+  for(const b of FP.blocks){const k=KIND[b.kind],mat=M(k[0],{m:.3,r:.5,e:k[0],ei:.22}),a=[fl,b.w-.05,b.h,b.d-.05,b.x,b.h/2,b.z,mat];
+    part(b.kind==='l2'?boxT(...a,MT(TEX.l2,{e:0x7a2070,ei:.5}),k[1]):box(...a,k[1]),{name:b.name,layer:b.layer,tip:Object.assign({t:b.name},b.tip),lb:b.lb,fp:b});}
+  // NoC mesh: routers at each core, row trunks, links to the memory controllers
+  const rp=FP.cores.map(c=>{const r=c.rect(CORE.by.rt.u,CORE.by.rt.v);return new THREE.Vector3(r.x,.34,r.z);}),seg=[];
+  for(const c of FP.cores){const a=rp[c.id];if(c.k<7)seg.push(a,rp[c.id+1]);if(c.r<3)seg.push(a,rp[c.id+8]);if(c.k===0)seg.push(a,new THREE.Vector3(-6.95,.34,a.z));if(c.k===7)seg.push(a,new THREE.Vector3(6.95,.34,a.z));}
+  const noc=grp(fl);noc.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seg),LM(COL.gr,.75)));
+  inst(noc,BOX,GL(COL.gr),rp.map(p=>[p.x,p.y,p.z,.1,.05,.1]));
+  for(let r=0;r<4;r++)box(noc,13.9,.035,.09,0,.34,rp[r*8].z,GL(COL.gr,.55));
+  part(noc,{name:'2D-mesh NoC',layer:'io',tip:{t:'2D-mesh network-on-chip',r:[['Topology','8 × 4 mesh, one 5-port router per core','T'],['Local link','512 bit at 1 GHz = 64 GB/s','T'],['Row trunk','2,048 bit at 1 GHz = 256 GB/s','T'],['Hop latency','1–2 cycles','E']],n:'Four row trunks per side carry ≈ 1 TB/s from each HBM controller into the core grid.'},lb:['2D-mesh NoC','8 × 4 routers · 64 GB/s links',6,[4.2,0,-2.2]]});
+  const sn=FP.cores.map(c=>{const r=c.rect([.92,1.0],[.92,1.0]);return[r.x,.31,r.z,.09,.05,.09];}).concat([[-8.05,.22,-3],[-8.05,.22,3],[8.05,.22,-3],[8.05,.22,3],[-3.6,.19,0],[3.6,.19,0],[0,.22,6.05],[0,.3,-.56]].map(a=>a.concat([.09,.05,.09])));
+  part(inst(fl,BOX,GL(COL.am),sn),{name:'On-die sensors',layer:'power',inst:true,nobox:true,tip:{t:'On-die thermal and droop sensors',r:[['Count','≈ 40 (one per core, plus PHYs and SRAM)','E'],['Feed','the DVFS and throttling loop',null]]}});
+  // die layers that appear when exploded
+  const beol=new THREE.MeshBasicMaterial({map:texWires('rgba(34,230,255,.9)','rgba(255,43,214,.9)',900),transparent:true,opacity:.6,depthWrite:false,side:THREE.DoubleSide});
+  part(box(g,FP.W,.05,FP.D,0,.6,0,beol,COL.cy),{name:'Front-side signal metal',layer:'io',ex:[0,3.4,0],cond:w=>w.explode>.05,tip:{t:'Front-side signal metal stack',r:[['Layers','M0–M15: 16 layers assumed (15–20 typical)','T'],['Lower layers','EUV-patterned, ≈ 20–44 nm pitch','E'],['Carries','signals and clocks only; power comes from the back',null]]},lb:['Signal metal stack','M0–M15 · EUV lower layers',6,[-6,0,3]]});
+  part(box(g,13.6,.3,6,0,1,0,M(0xb02c98,{o:.42,e:0x4a1040,m:.4,r:.4}),COL.mg),{name:'3D-stacked SRAM',layer:'memory',ex:[0,6.2,0],cond:w=>w.explode>.05,tip:{t:'3D-stacked SRAM die (optional)',r:[['Bonding','hybrid bonding, ≤ 9 µm pitch','F'],['Capacity','≈ 256 MB','E'],['Bandwidth','≈ 2 TB/s','E']],n:'Sits above the L2 spine and the inner core rows, in the heat path.'},lb:['3D-stacked SRAM (optional)','≈ 256 MB · hybrid bonded',6]});
+  const pdn=new THREE.MeshBasicMaterial({map:tex(512,512,(c,w,h)=>{c.clearRect(0,0,w,h);c.fillStyle='rgba(255,176,32,.16)';c.fillRect(0,0,w,h);c.fillStyle='rgba(255,190,60,.95)';for(let i=0;i<=16;i++){c.fillRect(i*w/16-3,0,6,h);c.fillRect(0,i*h/16-3,w,6);}}),transparent:true,depthWrite:false,side:THREE.DoubleSide});
+  part(box(g,FP.W-.2,.05,FP.D-.2,0,-.36,0,pdn,COL.am),{name:'Backside power network',layer:'power',ex:[0,-3,0],cond:w=>w.explode>.05,tip:{t:'Backside power network (BSPDN)',r:[['Delivers','≈ 50–70 A at ≈ 0.7 V','E'],['Why','1 mΩ of grid resistance costs 50–70 mV, up to 10% of the supply','E'],['Found on','Intel 18A, TSMC A16, Samsung SF2Z — not base N2','F']]},lb:['Backside power network','≈ 70 A from below',6,[5,0,3]]});
+});
+
+/* ================= L3 · one NPU core (mm) ================= */
+const CT={
+ sp:{r:[['Capacity','8 × 1 MB macros (range 4–8 MB)','T'],['Bandwidth','2 ports × 1,024 bit × 1 GHz = 256 GB/s','T'],['Area','≈ 1.68 mm² — larger than the MAC array','E'],['Holds','weight tiles, activation rows, partial sums',null]]},
+ vu:{r:[['Does','element-wise add/multiply, residuals, pooling, compares, attention masks',null],['Width','128 lanes × 16 bit','E'],['Area','≈ 0.15 mm²','E']]},
+ tfu:{r:[['Softmax','exp look-up table + reciprocal','T'],['LayerNorm / RMSNorm','reciprocal square root','T'],['GELU / SiLU','piecewise look-up table, 256–1,024 entries','E'],['Area','≈ 0.10 mm²','E']]},
+ qdq:{r:[['Does','scale-and-shift requantisation, per-channel scales, saturating round','T'],['Formats','INT4 ↔ INT8 ↔ FP8 ↔ FP16 / BF16','T'],['Area','≈ 0.05 mm²','E']]},
+ rv:{r:[['Role','layer sequencing, loop control, exceptions, firmware micro-kernel','T'],['Class','small RV64 microcontroller-class core','E'],['Area','≈ 0.05 mm²','E']]},
+ spd:{r:[['Scheme','2:4 structured: 2 non-zero weights in every group of 4','T'],['Weight bytes','(2 × 8 + 4 index bits) / 32 = 0.625× at INT8','T'],['Throughput','up to ≈ 2× on pruned layers','E'],['Area','≈ 0.04 mm²','E']]},
+ dma:{r:[['Moves','tensors between the NoC and the scratchpad; strided gather/scatter','T'],['Rate','512 bit at 1 GHz = 64 GB/s','T']]},
+ rt:{r:[['Ports','north, east, south, west, local; 512-bit flits','T'],['Latency','1–2 cycles per hop','E']]},
+ pg:{r:[['Power gating','header switches, retention for control state','T'],['DVFS island','own voltage and frequency point','T'],['Sensors','thermal diode + droop detector','E'],['Clock','local mesh, idle PE rows are clock-gated','E']]}};
+const CLB={sp:['Scratchpad SRAM · 8 MB','256 GB/s',8],vu:['Vector unit','128 lanes',6],tfu:['Transformer-function unit','softmax · LayerNorm · GELU',7],qdq:['Quant / dequant','',5],rv:['RISC-V control core','',6],spd:['Sparsity decoder','2:4',5],dma:['DMA engine','64 GB/s',5],rt:['NoC router','',5],pg:['Power gate · clock','',4]};
+const c3=(s)=>[(s.u[0]+s.u[1])/2-.85,1.1-(s.v[0]+s.v[1])/2,s.u[1]-s.u[0],s.v[1]-s.v[0]];
+BUILD.push(function buildL3(){
+  const v=view('L3',{lvl:3,scale:9,mpw:1e-3/9,cam:[0,23,18],tgt:[0,0,.3],gridY:-.6});
+  const g=v.group;
+  part(box(g,1.7,.02,2.2,0,-.01,0,M(0x0d1828,{m:.4,r:.5}),0x2c5f8a),{name:'Core tile',tip:{t:'NPU core tile',s:'Compute',r:[['Size','1.7 × 2.2 mm = 3.74 mm²','E'],['Peak',`${f1(K.topsCore)} TOPS INT8 · ${f1(K.topsCore*2)} TOPS INT4`,'T'],['Blocks','MAC array, scratchpad, vector, transformer, quant, sparsity, RISC-V, DMA, router',null]]}});
+  const ring=grp(g);for(const s of[-1,1]){box(ring,1.7,.014,.02,0,.007,s*1.09,GL(COL.am,.9));box(ring,.02,.014,2.2,s*.84,.007,0,GL(COL.am,.9));}
+  part(ring,{name:'Power-gate ring',layer:'power',tip:Object.assign({t:'Power-gate ring'},CT.pg)});
+  for(const s of CORE.sub){const[x,z,w,d]=c3(s),k=KIND[s.kind];
+    if(s.id==='sp'){const sg=grp(g);for(let i=0;i<4;i++)for(let j=0;j<2;j++)boxT(sg,.385,s.h,.5,.25+i*.4-.85,s.h/2,1.1-(1.3625+j*.525),M(k[0],{e:0x2a0626}),MT(TEX.sram,{e:0x6a1a5e,ei:.55}),k[1]);
+      part(sg,{name:s.n,layer:s.layer,ex:[0,.12,0],tip:Object.assign({t:'Local scratchpad SRAM (8 MB)'},CT.sp),lb:CLB.sp});}
+    else if(s.id==='mac'){const mg=grp(g);boxT(mg,w,s.h,d,x,s.h/2,z,M(k[0],{e:0x04303c}),macMat(128),k[1]);
+      box(mg,w,.012,.028,x,s.h+.006,z-d/2+.014,GL(COL.cy));box(mg,.028,.012,d,x-w/2+.014,s.h+.006,z,GL(COL.mg));box(mg,w,.012,.028,x,s.h+.006,z+d/2-.014,GL(COL.gr));
+      const mk=new THREE.LineSegments(EDGE,new THREE.LineBasicMaterial({color:COL.mg}));mk.position.set(x+.12,s.h+.012,z+.1);mk.scale.set(.07,.02,.07);mg.add(mk);v.ticks.push((dt,t)=>{const q=.07*(1+.25*Math.sin(t*5));mk.scale.set(q,.02,q);});
+      part(mg,{name:s.n,layer:s.layer,drill:4,ex:[0,.26,0],tip:{t:'128 × 128 systolic MAC array',r:[['Elements','16,384 PEs','T'],['Formats','INT4 · INT8 · FP8 native; FP16 / BF16 by fusing 2 × 2 PEs','E'],['Peak',`${f1(K.topsCore)} TOPS INT8 · ${f1(K.topsCore*2)} TOPS INT4`,'T'],['Edge intake','128 weight + 128 activation bytes per cycle = 256 GB/s','T'],['Inside','≈ 32.8 TB/s of register-to-register traffic','T'],['Area','1.02 × 1.02 mm, ≈ 64 µm² per PE','E']],n:'Cyan edge: weights enter from the north. Magenta edge: activations enter from the west. Green edge: sums leave to the south.'},lb:['128 × 128 systolic MAC array',`16,384 PEs · ${f1(K.topsCore)} TOPS`,9]});
+      v.macTop=[x,s.h,z,w,d];}
+    else part(box(g,w,s.h,d,x,s.h/2,z,M(k[0],{m:.3,r:.5,e:k[0],ei:.25}),k[1]),{name:s.n,layer:s.layer,ex:[0,.18,0],tip:Object.assign({t:s.n},CT[s.id]),lb:CLB[s.id]});}
+});
+
+/* ================= L4 · one MAC processing element (µm) ================= */
+const PEB=[ // id,name,color,x,z,w,d,h,rows,label
+ ['mul','8 × 8 multiplier',0x0c7892,-.4,-.6,3.6,3.2,.5,[['Type','radix-4 Booth + Wallace tree','E'],['Modes','1 × INT8 · 2 × INT4 · FP8 mantissa; 2 × 2 PEs fuse for FP16','E'],['Share of PE area','≈ 45%','E'],['Energy','≈ 15–25 fJ per INT8 multiply','E']],['8 × 8 multiplier','INT8 · 2 × INT4 · FP8',8]],
+ ['add','Carry-save adder',0x178a70,-.4,2,3.6,1.4,.4,[['Width','32-bit sum: room for 65,536 INT8 products','T'],['Critical path','multiplier + adder inside the 1 ns cycle','T']],['Adder','32-bit',7]],
+ ['acc','Accumulator register',0x4756c8,-.4,3.4,3.6,.8,.3,[['Width','32 bits','T'],['Does','holds the running dot-product; drains south when the row is done',null]],['Accumulator','32-bit register',6]],
+ ['areg','Activation register',0x8a3fb8,-3.3,-.6,.9,2.2,.3,[['Width','8 bits','T'],['Systolic step','captures the activation from the west neighbour every clock',null]],['Activation reg','8-bit',6]],
+ ['wreg','Weight register',0x2a8fd0,-.4,-3.3,2.2,.9,.3,[['Width','8 bits + 2-bit sparsity index','T'],['Systolic step','captures the weight from the north neighbour every clock',null]],['Weight reg','8-bit',6]],
+ ['zs','Zero-skip clock gate + mode decode',0x94690f,-3.2,-3.2,1.2,1.2,.3,[['Does','stops the multiplier clock when either operand is zero','T'],['Selects','INT4 / INT8 / FP8 mode','T'],['Saves','dynamic power on sparse activations and 2:4-pruned weights',null]],['Zero-skip gate','',5]],
+ ['fp','FP align · normalise · round',0x1f4f86,2.9,-1,1.6,2.4,.35,[['Does','exponent add, alignment shift and rounding for FP8','E'],['FP16 / BF16','shared across a fused 2 × 2 group of PEs','E']],['FP align / round','FP8 · FP16',5]],
+ ['aout','Activation forward register',0x8a3fb8,3.3,1.6,.9,1.6,.3,[['Does','passes the activation to the east neighbour next clock',null]],null],
+ ['wout','Weight forward register',0x2a8fd0,2.9,3.4,1.4,.8,.3,[['Does','passes the weight to the south neighbour next clock',null]],null]];
+BUILD.push(function buildL4(){
+  const v=view('L4',{lvl:4,scale:2.5,mpw:1e-6/2.5,cam:[0,24,19],tgt:[0,0,.4],gridY:-1.2});
+  const g=v.group,rows=tex(256,256,(c,w,h)=>{c.fillStyle='#c9d6e8';c.fillRect(0,0,w,h);for(let i=0;i<24;i++){c.fillStyle=i%2?'rgba(0,0,0,.28)':'rgba(0,0,0,.12)';c.fillRect(0,i*h/24,w,h/24-1);for(let k=0;k<14;k++){c.fillStyle='rgba(0,0,0,.35)';c.fillRect(rnd()*w,i*h/24,1.5,h/24);}}});
+  part(box(g,8,.06,8,0,-.03,0,M(0x0d1828,{m:.4,r:.5}),COL.cy),{name:'MAC processing element',tip:{t:'MAC processing element (PE)',s:'Compute',r:[['Footprint','≈ 8 × 8 µm = 64 µm²','E'],['Transistors','≈ 8,000','E'],['Throughput','1 MAC = 2 ops per 1 ns cycle','T'],['Energy','≈ 40 fJ datapath; ≈ 95 fJ all-in budget at 50 W','E']]}});
+  for(const[sx,sz]of[[-1,0],[1,0],[0,-1],[0,1]])box(g,8,.04,8,sx*8.25,-.04,sz*8.25,M(0x0d1828,{o:.35}),0x2c5f8a);
+  const cell=box(g,.5,.14,.28,.5,.57,-1.3,GL(COL.cy),0xffffff);
+  part(cell,{name:'One logic gate',layer:'compute',drill:5,tip:{t:'One standard cell (NAND2)',r:[['Transistors','4 GAA nanosheet FETs','F'],['Cell height','≈ 5–6 tracks ≈ 0.13–0.16 µm','E'],['In this PE','≈ 2,000 gates','E']],n:'Drawn far larger than life so it can be clicked.'},lb:['1 logic gate','4 transistors',9]});
+  v.ticks.push((dt,t)=>{cell.scale.y=.14*(1+.5*Math.abs(Math.sin(t*3)));});
+  for(const b of PEB){const m=new THREE.MeshStandardMaterial({map:rows,color:b[2],metalness:.3,roughness:.5,emissive:b[2],emissiveIntensity:.3});
+    part(boxT(g,b[5],b[7],b[6],b[3],b[7]/2,b[4],M(b[2],{m:.3,r:.5,e:b[2],ei:.2}),m,0x9fd8ff),{name:b[1],layer:'compute',tip:{t:b[1],r:b[8]},lb:b[9]});}
+  v.dyn={};for(const[k,pos,txt]of[['a',[-3.3,.9,-.6],'a'],['w',[-.4,.9,-3.3],'w'],['p',[-.4,1.2,-.2],'a × w'],['s',[-.4,.9,3.4],'acc']]){const o=grp(g,...pos);v.dyn[k]=label(o,[txt,'',10],{col:COL.wh});}
+  let cyc=-1,acc=0,nn=0;v.ticks.push((dt,t)=>{const c=Math.floor(t/1.6);if(c===cyc||!v.dyn.a.el)return;cyc=c;const a=Math.floor(rnd()*128),w=Math.floor(rnd()*256)-128;if(nn++%8===0)acc=0;acc+=a*w;
+    const S=(l,s)=>{l.el.firstChild.textContent=s;l.m=0;};S(v.dyn.a,'a = '+a);S(v.dyn.w,'w = '+w);S(v.dyn.p,`a × w = ${a*w}`);S(v.dyn.s,'acc = '+acc);});
+});
+
+/* ================= L5 · transistor + metal stack (nm, schematic) ================= */
+BUILD.push(function buildL5(){
+  const v=view('L5',{lvl:5,scale:.085,mpw:1e-9/.085,cam:[17,12.5,24],tgt:[0,4.4,0],explode:.1,gridY:-19});
+  const g=v.group,BSP='Intel 18A (PowerVia), TSMC A16 (Super Power Rail), Samsung SF2Z';
+  part(box(g,192,26,150,0,-13,0,M(0x1a2a4a,{o:.4,m:.2,r:.6}),0x3b5f95),{name:'Thinned silicon',ex:[0,-3,0],tip:{t:'Thinned silicon / bottom isolation',s:'Wafer',r:[['How','after front-side processing the wafer is bonded to a carrier, flipped and ground back',null],['Remaining','well under 1 µm','E']],n:'Thin silicon spreads heat poorly, one of the costs of backside power.'},lb:['Thinned silicon','wafer ground away from the back',4,[70,0,60]]});
+  v.chan=[];
+  for(const[z,c,n,ep,epn]of[[-34,0x35d6ff,'n-FET',0x1fbf9a,'Si:P'],[34,0xff5ad6,'p-FET',0xb86bff,'SiGe:B']]){
+    const ch=grp(g),cm=new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.4,metalness:.2,roughness:.4});for(let i=0;i<3;i++)box(ch,192,5,32,0,9+i*14,z,cm);v.chan.push(cm);
+    part(ch,{name:n+' nanosheet channels',layer:'compute',tip:{t:`Stacked nanosheet channels (${n})`,r:[['Sheets','3 per device (3–4 typical)','E'],['Thickness','≈ 5–6 nm of silicon','E'],['Width','≈ 15–45 nm, chosen per cell to set drive strength','E']],n:'Gate-all-around: the gate wraps each sheet on all four sides, which cuts leakage compared with a FinFET.'},lb:z<0?['Nanosheet channels','3 sheets · ≈ 5 nm thick',8,[-60,0,0]]:null});
+    const eg=grp(g);for(const x of[-72,-24,24,72])box(eg,22,44,38,x,22,z,M(ep,{m:.2,r:.5,e:ep,ei:.18}),0xffffff);
+    part(eg,{name:n+' source / drain',layer:'compute',tip:{t:`Source / drain epitaxy (${n})`,r:[['Material',epn,'F'],['Does','feeds current into every sheet at once',null]]},lb:z>0?['Source / drain epitaxy','SiGe:B (p) · Si:P (n)',6,[72,0,0]]:null});}
+  const gt=grp(g);for(const x of[-48,0,48]){box(gt,14,52,146,x,25,0,M(0xe0b84a,{o:.3,m:.8,r:.3}),0xffd97a);box(gt,14,5,146,x,53.5,0,M(0x8fa3bf,{o:.5}));for(const s of[-1,1])box(gt,3,52,146,x+s*8.5,25,0,M(0xbfd3ea,{o:.16}));}
+  part(gt,{name:'Gate-all-around metal gate',layer:'compute',tip:{t:'Gate-all-around metal gate',r:[['Gate length','≈ 12 nm','E'],['Gate pitch','≈ 48 nm','E'],['Stack','high-k dielectric + work-function metal between and around the sheets','F']],n:'Pitches are analyst-reported class values, not foundry-confirmed.'},lb:['Gate (all-around)','≈ 12 nm long · ≈ 48 nm pitch',8,[0,0,-60]]});
+  const ct=grp(g),tung=M(0x9aa6b5,{m:.9,r:.35});for(const z of[-34,34])for(const x of[-72,-24,24,72])box(ct,12,22,26,x,55,z,tung);box(ct,10,13,14,0,63.5,0,tung);
+  part(ct,{name:'Contacts',layer:'io',ex:[0,4,0],tip:{t:'Source / drain and gate contacts',r:[['Metal','tungsten, cobalt, ruthenium or molybdenum','F'],['Link','transistor to the first metal layer (M0)',null]]}});
+  const ML=[[20,7,6,'EUV'],[24,7,6,'EUV'],[24,7,6,'EUV'],[28,8,6,'EUV'],[32,8,6,'EUV'],[36,8,6,'EUV'],[44,8,6,'EUV'],[44,9,7,'EUV'],[64,10,7,'DUV'],[64,10,7,'DUV'],[80,11,8,'DUV'],[80,11,8,'DUV'],[126,13,8,'DUV'],[126,13,8,'DUV'],[360,17,10,'thick'],[720,20,10,'thick']];
+  const LT={EUV:[0xff7ad9,'EUV, 13.5 nm light; tightest layers double-patterned or high-NA','M0–M7 · EUV-patterned','≈ 20–44 nm pitch'],DUV:[0x7fb4ff,'193 nm immersion','M8–M13 · immersion DUV','≈ 64–126 nm pitch'],thick:[0xe0a060,'relaxed lithography, thick copper','M14–M15 · thick metal','clocks · global routes']};
+  let y=74;ML.forEach((L,i)=>{const[p,t,gap,lit]=L,vp=Math.min(p,96),ax=i%2===0,lg=grp(g),mat=M(LT[lit][0],{m:.8,r:.3,e:LT[lit][0],ei:.12}),n=Math.max(2,Math.floor((ax?150:192)/vp));
+    for(let k=0;k<n;k++){const o=(k-(n-1)/2)*vp;ax?box(lg,192,t,vp/2,0,y+t/2,o,mat):box(lg,vp/2,t,150,o,y+t/2,0,mat);}
+    part(lg,{name:'Metal layer M'+i,layer:'io',ex:[0,10+i*7,0],tip:{t:'Metal layer M'+i,s:'Front-side signal routing',r:[['Pitch',`≈ ${p} nm (illustrative)`+(p>96?', drawn compressed':''),'E'],['Patterning',LT[lit][1],lit==='EUV'?'F':null],['Direction',ax?'east–west':'north–south',null]],n:'16 layers assumed; 15–20 is typical at this node class.'},lb:i===3||i===10||i===15?[LT[lit][2],LT[lit][3],i===3?8:5,[ax?0:70,0,ax?50:0]]:null});
+    y+=t+gap;});
+  part(box(g,192,34,150,0,y+19,0,M(0x24344f,{o:.32,m:.3,r:.5}),0x3b5f95),{name:'Carrier wafer',ex:[0,10+16*7+12,0],tip:{t:'Carrier wafer (bonded)',s:'Wafer',r:[['Why','holds the device wafer while its back is ground away and the power network is built',null],['Side effect','heat now leaves through the metal stack and this carrier',null]]},lb:['Carrier wafer','bonded before backside processing',4]});
+  const pw=(c)=>M(c,{m:.7,r:.35,e:c,ei:.25});
+  const tsv=grp(g);for(const z of[-34,34])for(const x of[-24,72])box(tsv,10,34,14,x,-17,z,pw(COL.am));
+  part(tsv,{name:'Backside contact',layer:'power',ex:[0,-9,0],tip:{t:'Backside contact (nano-TSV)',r:[['Does','connects a transistor source straight down to the power rail','F'],['Used in',BSP,'F']],n:'TSMC’s base N2 keeps power on the front. A 2nm-class design with backside power means an 18A / A16 / SF2Z-style process.'},lb:['Backside contact','source → power rail',7,[-24,-30,-34]]});
+  const b0=grp(g);box(b0,192,16,44,0,-42,-34,pw(0xffc83c));box(b0,192,16,44,0,-42,34,pw(0xff8a3c));
+  part(b0,{name:'Backside power rails (BM0)',layer:'power',ex:[0,-20,0],tip:{t:'Backside power rails (BM0)',r:[['Rails','VSS under the n-FET row, VDD under the p-FET row',null],['Benefit','lower IR drop; front-side tracks freed for signals','F'],['Layers','≈ 3 backside metals assumed','E']]},lb:['Backside power rails','VDD · VSS from below',8,[60,-10,0]]});
+  const b1=grp(g);for(const x of[-64,0,64])box(b1,40,22,150,x,-73,0,pw(0xffa83c));
+  part(b1,{name:'Backside metal BM1',layer:'power',ex:[0,-31,0],tip:{t:'Backside metal BM1',r:[['Does','wide, low-resistance straps across the rails',null]]}});
+  const b2=grp(g);for(const z of[-40,40])box(b2,192,30,60,0,-113,z,pw(0xff9a2c));const bump=new THREE.Mesh(new THREE.CylinderGeometry(30,30,18,28),M(0xe6b422,{m:1,r:.25}));bump.position.set(0,-137,0);b2.add(bump);
+  part(b2,{name:'Backside metal BM2 + power bump',layer:'power',ex:[0,-44,0],tip:{t:'Backside top metal + power bump',r:[['Connects','the power grid to package bumps and the integrated regulators',null],['Current','≈ 50–70 A across the whole die','E']]}});
+  let on=0;v.ticks.push((dt,t)=>{on=Math.sin(t*2.2)>0?1:0;v.gateOn=on;v.chan[0].emissiveIntensity+=((on?1.5:.25)-v.chan[0].emissiveIntensity)*.2;v.chan[1].emissiveIntensity+=((on?.25:1.5)-v.chan[1].emissiveIntensity)*.2;});
+});
+//@@NEXT
+
+/* ================= boot ================= */
+let T=0,last=performance.now();
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;frameNo++;
+  if(fly)stepFly(now);else controls.update();
+  if(cur){for(const f of cur.ticks)f(dt,T);FX.tick(dt,T);}
+  updateHover();updateLabels();if(frameNo%8===0)updateScale();
+  if(press&&now-pressT>1100){press=0;diveEl.classList.remove('on');}
+  renderer.render(scene,camera);tickFps(now);}
+BUILD.forEach(f=>f());Object.values(VIEWS).forEach(finalize);
+initUI();go(VIEWS.L0);window.__npuReady=true;
+window.__npu={state,VIEWS,goLevel,setMode,camera,controls,renderer,scene,get cur(){return cur;},get busy(){return busy;}};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
